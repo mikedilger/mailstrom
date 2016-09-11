@@ -2,3 +2,6 @@
 name = "mailstrom"
 version = "0.1.0-unstable"
 authors = ["Mike Dilger <mike@optcomp.nz>"]
+
+[dev-dependencies]
+env_logger = "0.3"
