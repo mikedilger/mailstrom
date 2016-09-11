@@ -1,6 +1,8 @@
 
 #![feature(integer_atomics)]
 
+extern crate uuid;
+
 #[cfg(test)]
 mod tests;
 mod worker;

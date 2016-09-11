@@ -5,3 +5,6 @@ authors = ["Mike Dilger <mike@optcomp.nz>"]
 
 [dev-dependencies]
 env_logger = "0.3"
+
+[dependencies]
+uuid = { version = "0.3", features = [ "v4" ] }
