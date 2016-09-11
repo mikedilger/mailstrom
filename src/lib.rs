@@ -4,6 +4,7 @@
 #[cfg(test)]
 mod tests;
 mod worker;
+pub mod error;
 
 use std::sync::{mpsc, Arc};
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -11,6 +12,7 @@ use std::thread;
 use std::ops::Drop;
 
 use worker::{Worker, Message};
+use error::Error;
 
 pub use worker::WorkerStatus;
 
@@ -43,7 +45,7 @@ impl Mailstrom
 
     /// Ask Mailstrom to die.  This is not required, you can simply let it fall out
     /// of scope and it will clean itself up.
-    pub fn die(&mut self) -> Result<(), mpsc::SendError<Message>>
+    pub fn die(&mut self) -> Result<(), Error>
     {
         try!(self.sender.send(Message::Terminate));
         Ok(())
