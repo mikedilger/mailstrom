@@ -4,6 +4,7 @@
 extern crate uuid;
 extern crate email_format;
 extern crate resolv;
+extern crate lettre;
 
 #[cfg(test)]
 mod tests;

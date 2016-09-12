@@ -10,3 +10,4 @@ env_logger = "0.3"
 uuid = { version = "0.3", features = [ "v4" ] }
 email-format = { git = "https://github.com/mikedilger/email-format", branch = "master" }
 resolv = "0.1"
+lettre = "0.6"
