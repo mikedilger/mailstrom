@@ -2,6 +2,7 @@
 #![feature(integer_atomics)]
 
 extern crate uuid;
+extern crate email_format;
 
 #[cfg(test)]
 mod tests;
