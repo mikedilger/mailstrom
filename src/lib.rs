@@ -8,6 +8,7 @@ extern crate email_format;
 mod tests;
 mod worker;
 pub mod error;
+mod email;
 
 use std::sync::{mpsc, Arc};
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -16,6 +17,7 @@ use std::ops::Drop;
 
 use worker::{Worker, Message};
 use error::Error;
+use email::Email;
 
 pub use worker::WorkerStatus;
 
