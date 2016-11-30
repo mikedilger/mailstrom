@@ -22,8 +22,14 @@ use email::Email;
 
 pub use worker::WorkerStatus;
 
+pub struct Config
+{
+    pub helo_name: String
+}
+
 pub struct Mailstrom
 {
+    config: Config,
     sender: mpsc::Sender<Message>,
     worker_status: Arc<AtomicU8>,
 }
@@ -31,7 +37,7 @@ pub struct Mailstrom
 impl Mailstrom
 {
     /// Create a new Mailstrom instance for sending emails.
-    pub fn new() -> Mailstrom
+    pub fn new(config: Config) -> Mailstrom
     {
         let (sender, receiver) = mpsc::channel();
 
@@ -44,6 +50,7 @@ impl Mailstrom
         });
 
         Mailstrom {
+            config: config,
             sender: sender,
             worker_status: worker_status,
         }
@@ -66,7 +73,7 @@ impl Mailstrom
     /// Send an email
     pub fn send_email(&mut self, rfc_email: RfcEmail) -> Result<(), Error>
     {
-        let email = try!(Email::from_rfc_email(rfc_email, "hello_name_fixme"));
+        let email = try!(Email::from_rfc_email(rfc_email, &*self.config.helo_name));
 
         // For now, just display and forget (FIXME)
         println!("{:?}", email);
