@@ -14,6 +14,7 @@ use std::sync::{mpsc, Arc};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::thread;
 use std::ops::Drop;
+use email_format::Email as RfcEmail;
 
 use worker::{Worker, Message};
 use error::Error;
@@ -60,6 +61,16 @@ impl Mailstrom
     pub fn worker_status(&self) -> WorkerStatus
     {
         WorkerStatus::from_u8(self.worker_status.load(Ordering::SeqCst))
+    }
+
+    /// Send an email
+    pub fn send_email(&mut self, rfc_email: RfcEmail) -> Result<(), Error>
+    {
+        let email = try!(Email::from_rfc_email(rfc_email, "hello_name_fixme"));
+
+        // For now, just display and forget (FIXME)
+        println!("{:?}", email);
+        Ok(())
     }
 }
 
