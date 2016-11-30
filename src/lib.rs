@@ -1,19 +1,23 @@
 
+#![feature(integer_atomics)]
+
 #[cfg(test)]
 mod tests;
 mod worker;
 
 use std::sync::{mpsc, Arc};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::thread;
 use std::ops::Drop;
 
 use worker::{Worker, Message};
 
+pub use worker::WorkerStatus;
+
 pub struct Mailstrom
 {
     sender: mpsc::Sender<Message>,
-    dead: Arc<AtomicBool>,
+    worker_status: Arc<AtomicU8>,
 }
 
 impl Mailstrom
@@ -23,9 +27,9 @@ impl Mailstrom
     {
         let (sender, receiver) = mpsc::channel();
 
-        let dead = Arc::new(AtomicBool::new(false));
+        let worker_status = Arc::new(AtomicU8::new(WorkerStatus::Ok as u8));
 
-        let mut worker = Worker::new(receiver, dead.clone());
+        let mut worker = Worker::new(receiver, worker_status.clone());
 
         let _ = thread::spawn(move|| {
             worker.run();
@@ -33,7 +37,7 @@ impl Mailstrom
 
         Mailstrom {
             sender: sender,
-            dead: dead,
+            worker_status: worker_status,
         }
     }
 
@@ -45,10 +49,10 @@ impl Mailstrom
         Ok(())
     }
 
-    /// Determine if Mailstrom is dead
-    pub fn is_dead(&self) -> bool
+    /// Determine the status of the worker
+    pub fn worker_status(&self) -> WorkerStatus
     {
-        self.dead.load(Ordering::SeqCst)
+        WorkerStatus::from_u8(self.worker_status.load(Ordering::SeqCst))
     }
 }
 
