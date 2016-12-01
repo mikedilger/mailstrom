@@ -5,6 +5,7 @@ use email_format::Email as RfcEmail;
 use email_format::rfc5322::headers::Bcc;
 use email_format::rfc5322::types::{AddressList, Address, GroupList, Mailbox};
 use error::Error;
+use status::{Status, RecipientStatus};
 
 /// The result (so far) of the sending of an email to a particular recipient
 #[derive(Debug, Clone, PartialEq)]
@@ -92,25 +93,15 @@ impl Email
         })
     }
 
-    pub fn succeeded(&self) -> bool
+    pub fn as_status(&self) -> Status
     {
-        self.recipients.iter().all(|ref r| {
-            match r.result {
-                DeliveryResult::Delivered(_) => true,
-                _ => false
-            }
-        })
-    }
-
-    pub fn completed(&self) -> bool
-    {
-        self.recipients.iter().all(|ref r| {
-            match r.result {
-                DeliveryResult::Queued => false,
-                DeliveryResult::Deferred(_,_) => false,
-                _ => true,
-            }
-        })
+        Status {
+            message_id: self.message_id.clone(),
+            recipient_status: self.recipients.iter().map(|r| RecipientStatus {
+                recipient: r.email_addr.clone(),
+                result: r.result.clone(),
+            }).collect(),
+        }
     }
 }
 

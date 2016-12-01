@@ -8,10 +8,20 @@ extern crate lettre;
 
 #[cfg(test)]
 mod tests;
+
 mod worker;
+pub use worker::WorkerStatus;
+
 pub mod error;
+
 mod email;
+pub use email::DeliveryResult;
+
 pub mod storage;
+
+pub mod status;
+pub use status::Status;
+
 
 use std::sync::{mpsc, Arc, RwLock};
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -24,7 +34,6 @@ use error::Error;
 use email::Email;
 use storage::MailstromStorage;
 
-pub use worker::WorkerStatus;
 
 pub struct Config
 {
@@ -84,6 +93,19 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
         let email = try!(Email::from_rfc_email(rfc_email, &*self.config.helo_name));
 
         Ok(try!(self.sender.send(Message::SendEmail(email))))
+    }
+
+    // Query Status of email
+    pub fn query_status(&mut self, message_id: &str) -> Result<Status, Error>
+    {
+        let guard = match (*self.storage).read() {
+            Ok(guard) => guard,
+            Err(_) => return Err(Error::Lock),
+        };
+
+        let email = try!((*guard).retrieve(message_id));
+
+        Ok(email.as_status())
     }
 }
 

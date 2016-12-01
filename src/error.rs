@@ -13,6 +13,7 @@ pub enum Error {
     Storage(String),
     DnsUnavailable,
     Resolver(ResolvError),
+    Lock,
 }
 
 impl From<SendError<Message>> for Error {
