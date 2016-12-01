@@ -43,7 +43,7 @@ impl Mailstrom
 
         let worker_status = Arc::new(AtomicU8::new(WorkerStatus::Ok as u8));
 
-        let mut worker = Worker::new(receiver, worker_status.clone());
+        let mut worker = Worker::new(receiver, worker_status.clone(), &*config.helo_name);
 
         let _ = thread::spawn(move|| {
             worker.run();

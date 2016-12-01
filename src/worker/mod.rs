@@ -35,14 +35,21 @@ pub struct Worker
     pub receiver: mpsc::Receiver<Message>,
 
     worker_status: Arc<AtomicU8>,
+
+    helo_name: String,
 }
 
 impl Worker
 {
-    pub fn new(receiver: mpsc::Receiver<Message>, worker_status: Arc<AtomicU8>) -> Worker {
+    pub fn new(receiver: mpsc::Receiver<Message>,
+               worker_status: Arc<AtomicU8>,
+               helo_name: &str)
+               -> Worker
+    {
         Worker {
             receiver: receiver,
             worker_status: worker_status,
+            helo_name: helo_name.to_owned(),
         }
     }
 
