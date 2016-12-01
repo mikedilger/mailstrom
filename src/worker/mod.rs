@@ -5,6 +5,7 @@ use std::sync::{Arc, RwLock};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::time::Duration;
+use std::net::SocketAddr;
 
 use email::{Email, DeliveryResult};
 use storage::MailstromStorage;
@@ -102,6 +103,76 @@ impl<S: MailstromStorage + 'static> Worker<S>
     fn send_email(&mut self, mut email: Email) -> WorkerStatus
     {
         get_mx_records_for_email(&mut email);
+
+        'next_recipient:
+        for recipient in &mut email.recipients {
+
+            // Skip if already completed
+            match recipient.result {
+                DeliveryResult::Delivered(_) => continue,
+                DeliveryResult::Failed(_) => continue,
+                _ => {}
+            }
+
+            let mut attempt: u8 = 0;
+            let deferred_data: Option<(u8, String)> =
+                if let DeliveryResult::Deferred(a, ref msg) = recipient.result {
+                    Some((a, msg.clone()))
+                } else {
+                    None
+                };
+            if deferred_data.is_some() {
+                let (a,msg) = deferred_data.unwrap();
+                // Try again
+                attempt = a + 1;
+                if a == 3 {
+                    // Or fail if too many attempts
+                    recipient.result = DeliveryResult::Failed(
+                        format!("Failed after 3 attempts: {}", msg));
+                    continue;
+                }
+            }
+
+            // Skip (and complete) if no MX servers
+            if recipient.mx_servers.is_none() {
+                recipient.result = DeliveryResult::Failed(
+                    "MX records found but none are valid".to_owned());
+                continue;
+            }
+
+            // Sequence through MX servers
+            let mx_servers: &Vec<SocketAddr> = recipient.mx_servers.as_ref().unwrap();
+
+            for i in recipient.current_mx .. mx_servers.len() {
+
+                // Mark completed if this MX server is known to have been successfully
+                // delivered to already
+                if email.delivered_to_mx.contains(&mx_servers[i]) {
+                    recipient.result = DeliveryResult::Delivered(
+                        "[was delivered along with another recipients delivery]".to_owned());
+                    continue 'next_recipient;
+                }
+
+                // Attempt delivery to this MX server
+                recipient.result = ::worker::delivery::mx_delivery(
+                    &email.rfc_email, email.message_id.clone(),
+                    &mx_servers[i], &*self.helo_name, attempt);
+
+                match recipient.result {
+                    DeliveryResult::Delivered(_) => {
+                        // save in delivered_to_mx list
+                        email.delivered_to_mx.push(mx_servers[i].clone());
+                        // Exit mx loop
+                        break;
+                    },
+                    DeliveryResult::Deferred(_,_) => { } // continue MX loop
+                    _ => {
+                        // Exit mx loop
+                        break;
+                    }
+                }
+            }
+        }
 
         WorkerStatus::Ok
     }
