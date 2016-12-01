@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use email::Email;
 use storage::MailstromStorage;
+use error::Error;
 
 pub enum Message {
     /// Ask the worker to deliver an email
@@ -103,4 +104,25 @@ impl<S: MailstromStorage + 'static> Worker<S>
 
         WorkerStatus::Ok
     }
+}
+
+// Get MX records for a domain, in order of preference
+fn get_mx_records_for_domain(domain: String) -> Result<Vec<String>, Error>
+{
+    use resolv::{Resolver, Class, RecordType};
+    use resolv::Record;
+    use resolv::record::MX;
+
+    let mut resolver = match Resolver::new() {
+        Some(r) => r,
+        None => return Err(Error::DnsUnavailable),
+    };
+
+    let mut response = try!(resolver.query(domain.as_bytes(),
+                                           Class::IN,
+                                           RecordType::MX));
+
+    let mut records: Vec<Record<MX>> = response.answers::<MX>().collect();
+    records.sort_by(|a,b| a.data.preference.cmp(&b.data.preference));
+    Ok(records.into_iter().map(|rmx| rmx.data.exchange).collect())
 }
