@@ -3,11 +3,13 @@ extern crate env_logger;
 
 use email_format::Email;
 use {Mailstrom, WorkerStatus, Config};
+use storage::MemoryStorage;
 
 
 #[test]
 fn test_terminate() {
-    let mut mailstrom = Mailstrom::new(Config { helo_name: "localhost".to_owned() });
+    let mut mailstrom = Mailstrom::new(Config { helo_name: "localhost".to_owned() },
+                                       MemoryStorage::new());
     assert_eq!( mailstrom.worker_status(), WorkerStatus::Ok );
     mailstrom.die().unwrap();
     ::std::thread::sleep(::std::time::Duration::from_millis(100));
@@ -16,7 +18,8 @@ fn test_terminate() {
 
 #[test]
 fn test_submit_email() {
-    let mut mailstrom = Mailstrom::new(Config { helo_name: "localhost".to_owned() });
+    let mut mailstrom = Mailstrom::new(Config { helo_name: "localhost".to_owned() },
+                                       MemoryStorage::new());
 
     let mut email = Email::new(
         "myself@mydomain.com",  // "From:"

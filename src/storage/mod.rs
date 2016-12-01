@@ -1,4 +1,7 @@
 
+pub mod memory_storage;
+pub use self::memory_storage::MemoryStorage;
+
 use email::Email;
 
 pub trait MailstromStorageError: ::std::error::Error { }
