@@ -1,4 +1,6 @@
 
+mod delivery;
+
 use std::sync::{Arc, RwLock};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::atomic::{AtomicU8, Ordering};
