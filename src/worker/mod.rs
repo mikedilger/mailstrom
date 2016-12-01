@@ -1,10 +1,11 @@
 
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::time::Duration;
 
 use email::Email;
+use storage::MailstromStorage;
 
 pub enum Message {
     /// Ask the worker to deliver an email
@@ -34,26 +35,31 @@ impl WorkerStatus {
     }
 }
 
-pub struct Worker
+pub struct Worker<S: MailstromStorage + 'static>
 {
     pub receiver: mpsc::Receiver<Message>,
 
     worker_status: Arc<AtomicU8>,
 
     helo_name: String,
+
+    // Persistent shared storage
+    storage: Arc<RwLock<S>>,
 }
 
-impl Worker
+impl<S: MailstromStorage + 'static> Worker<S>
 {
     pub fn new(receiver: mpsc::Receiver<Message>,
+               storage: Arc<RwLock<S>>,
                worker_status: Arc<AtomicU8>,
                helo_name: &str)
-               -> Worker
+               -> Worker<S>
     {
         Worker {
             receiver: receiver,
             worker_status: worker_status,
             helo_name: helo_name.to_owned(),
+            storage: storage,
         }
     }
 

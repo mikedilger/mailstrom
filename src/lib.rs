@@ -9,8 +9,9 @@ mod tests;
 mod worker;
 pub mod error;
 mod email;
+pub mod storage;
 
-use std::sync::{mpsc, Arc};
+use std::sync::{mpsc, Arc, RwLock};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::thread;
 use std::ops::Drop;
@@ -19,6 +20,7 @@ use email_format::Email as RfcEmail;
 use worker::{Worker, Message};
 use error::Error;
 use email::Email;
+use storage::MailstromStorage;
 
 pub use worker::WorkerStatus;
 
@@ -27,23 +29,26 @@ pub struct Config
     pub helo_name: String
 }
 
-pub struct Mailstrom
+pub struct Mailstrom<S: MailstromStorage + 'static>
 {
     config: Config,
     sender: mpsc::Sender<Message>,
     worker_status: Arc<AtomicU8>,
+    storage: Arc<RwLock<S>>,
 }
 
-impl Mailstrom
+impl<S: MailstromStorage + 'static> Mailstrom<S>
 {
     /// Create a new Mailstrom instance for sending emails.
-    pub fn new(config: Config) -> Mailstrom
+    pub fn new(config: Config, storage: S) -> Mailstrom<S>
     {
         let (sender, receiver) = mpsc::channel();
 
+        let storage = Arc::new(RwLock::new(storage));
+
         let worker_status = Arc::new(AtomicU8::new(WorkerStatus::Ok as u8));
 
-        let mut worker = Worker::new(receiver, worker_status.clone(), &*config.helo_name);
+        let mut worker = Worker::new(receiver, storage.clone(), worker_status.clone(), &*config.helo_name);
 
         let _ = thread::spawn(move|| {
             worker.run();
@@ -53,6 +58,7 @@ impl Mailstrom
             config: config,
             sender: sender,
             worker_status: worker_status,
+            storage: storage,
         }
     }
 
@@ -79,7 +85,8 @@ impl Mailstrom
     }
 }
 
-impl Drop for Mailstrom {
+impl<S: MailstromStorage + 'static> Drop for Mailstrom<S>
+{
     fn drop(&mut self) {
         let _ = self.sender.send(Message::Terminate);
     }
