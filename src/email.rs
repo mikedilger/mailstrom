@@ -85,6 +85,9 @@ impl Email
 
         let recipients = determine_recipients(&rfc_email);
 
+        // Strip any Bcc header line (to make it blind)
+        rfc_email.clear_bcc();
+
         Ok(Email {
             rfc_email: rfc_email,
             message_id: message_id,
