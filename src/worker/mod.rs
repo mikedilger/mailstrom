@@ -25,6 +25,7 @@ pub enum WorkerStatus {
     Terminated = 1,
     ChannelDisconnected = 2,
     LockPoisoned = 3,
+    StorageWriteFailed = 4,
     Unknown = 255,
 }
 impl WorkerStatus {
@@ -34,6 +35,7 @@ impl WorkerStatus {
             1 => WorkerStatus::Terminated,
             2 => WorkerStatus::ChannelDisconnected,
             3 => WorkerStatus::LockPoisoned,
+            4 => WorkerStatus::StorageWriteFailed,
             _ => WorkerStatus::Unknown,
         }
     }
@@ -172,6 +174,21 @@ impl<S: MailstromStorage + 'static> Worker<S>
                     }
                 }
             }
+        }
+
+        // Lock the storage
+        let mut guard = match (*self.storage).write() {
+            Ok(guard) => guard,
+            Err(e) => {
+                println!("{:?}", e);
+                return WorkerStatus::LockPoisoned;
+            },
+        };
+
+        // Store the email delivery result (so far) into storage
+        if let Err(e) = (*guard).store(&email) {
+            println!("{:?}", e);
+            return WorkerStatus::StorageWriteFailed;
         }
 
         WorkerStatus::Ok
