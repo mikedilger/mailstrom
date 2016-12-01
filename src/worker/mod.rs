@@ -4,7 +4,7 @@ use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::time::Duration;
 
-use email::Email;
+use email::{Email, DeliveryResult};
 use storage::MailstromStorage;
 use error::Error;
 
@@ -97,17 +97,61 @@ impl<S: MailstromStorage + 'static> Worker<S>
         }
     }
 
-    fn send_email(&mut self, email: Email) -> WorkerStatus
+    fn send_email(&mut self, mut email: Email) -> WorkerStatus
     {
-        // For now, just display and forget (FIXME)
-        println!("{:?}", email);
+        get_mx_records_for_email(&mut email);
 
         WorkerStatus::Ok
     }
 }
 
+// Get MX records for email recipients
+fn get_mx_records_for_email(email: &mut Email)
+{
+    use std::net::{SocketAddr, ToSocketAddrs};
+
+    // Look-up the MX records for each recipient
+    for recipient in &mut email.recipients {
+        let mx_records = match get_mx_records_for_domain(&*recipient.domain) {
+            Err(e) => {
+                recipient.result = DeliveryResult::Failed(
+                    format!("Unable to fetch MX record: {:?}", e));
+                println!("MX LOOKUP FAILED FOR {}", recipient.email_addr);
+                continue;
+            }
+            Ok(records) => {
+                let mut mx_records: Vec<SocketAddr> = Vec::new();
+                for record in records {
+                    match (&*record, 25_u16).to_socket_addrs() {
+                        Err(_) => {
+                            println!("ToSocketAddr FAILED FOR {}: {}",
+                                     recipient.email_addr,
+                                     &*record);
+                            continue; // MX record invalid?
+                        },
+                        Ok(mut iter) => match iter.next() {
+                            Some(sa) => mx_records.push(sa),
+                            None => continue, // No MX records
+                        }
+                    }
+                }
+                if mx_records.len() == 0 {
+                    recipient.result = DeliveryResult::Failed(
+                        "MX records found but none are valid".to_owned());
+                    continue;
+                }
+                mx_records
+            }
+        };
+        recipient.mx_servers = Some(mx_records);
+        println!("DEBUG: got mx servers for {}: {:?}",
+                 recipient.email_addr,
+                 recipient.mx_servers.as_ref().unwrap());
+    }
+}
+
 // Get MX records for a domain, in order of preference
-fn get_mx_records_for_domain(domain: String) -> Result<Vec<String>, Error>
+fn get_mx_records_for_domain(domain: &str) -> Result<Vec<String>, Error>
 {
     use resolv::{Resolver, Class, RecordType};
     use resolv::Record;
