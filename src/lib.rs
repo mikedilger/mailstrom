@@ -87,12 +87,16 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
         WorkerStatus::from_u8(self.worker_status.load(Ordering::SeqCst))
     }
 
-    /// Send an email
-    pub fn send_email(&mut self, rfc_email: RfcEmail) -> Result<(), Error>
+    /// Send an email, getting back it's message-id
+    pub fn send_email(&mut self, rfc_email: RfcEmail) -> Result<String, Error>
     {
         let email = try!(Email::from_rfc_email(rfc_email, &*self.config.helo_name));
 
-        Ok(try!(self.sender.send(Message::SendEmail(email))))
+        let message_id = email.message_id.clone();
+
+        try!(self.sender.send(Message::SendEmail(email)));
+
+        Ok(message_id)
     }
 
     // Query Status of email
