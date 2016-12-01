@@ -75,9 +75,7 @@ impl Mailstrom
     {
         let email = try!(Email::from_rfc_email(rfc_email, &*self.config.helo_name));
 
-        // For now, just display and forget (FIXME)
-        println!("{:?}", email);
-        Ok(())
+        Ok(try!(self.sender.send(Message::SendEmail(email))))
     }
 }
 

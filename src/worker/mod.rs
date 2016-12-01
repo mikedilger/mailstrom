@@ -4,7 +4,11 @@ use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::time::Duration;
 
+use email::Email;
+
 pub enum Message {
+    /// Ask the worker to deliver an email
+    SendEmail(Email),
     /// Ask the worker to terminate
     Terminate,
 }
@@ -60,6 +64,14 @@ impl Worker
         loop {
             match self.receiver.recv_timeout(timeout) {
                 Ok(message) => match message {
+                    Message::SendEmail(email) => {
+                        let worker_status = self.send_email(email);
+                        if worker_status != WorkerStatus::Ok {
+                            self.worker_status.store(worker_status as u8,
+                                                     Ordering::SeqCst);
+                        }
+                        return;
+                    }
                     Message::Terminate => {
                         println!("Terminating");
                         self.worker_status.store(
@@ -76,5 +88,13 @@ impl Worker
             };
 
         }
+    }
+
+    fn send_email(&mut self, email: Email) -> WorkerStatus
+    {
+        // For now, just display and forget (FIXME)
+        println!("{:?}", email);
+
+        WorkerStatus::Ok
     }
 }
