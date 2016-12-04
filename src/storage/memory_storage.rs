@@ -2,7 +2,7 @@
 use std::error::Error;
 use std::fmt;
 use std::collections::HashMap;
-use email::Email;
+use internal_status::InternalStatus;
 use storage::{MailstromStorage, MailstromStorageError};
 
 #[derive(Debug)]
@@ -31,7 +31,7 @@ impl fmt::Display for MemoryStorageError {
 }
 
 pub struct MemoryStorage {
-    emails: HashMap<String, Email>,
+    emails: HashMap<String, InternalStatus>,
 }
 
 impl MemoryStorage {
@@ -45,16 +45,16 @@ impl MemoryStorage {
 impl MailstromStorage for MemoryStorage {
     type Error = MemoryStorageError;
 
-    fn store(&mut self, email: &Email) -> Result<(), MemoryStorageError>
+    fn store(&mut self, internal_status: &InternalStatus) -> Result<(), MemoryStorageError>
     {
-        self.emails.insert(email.message_id.clone(), email.clone());
+        self.emails.insert(internal_status.message_id.clone(), internal_status.clone());
         Ok(())
     }
 
-    fn retrieve(&self, message_id: &str) -> Result<Email, MemoryStorageError>
+    fn retrieve(&self, message_id: &str) -> Result<InternalStatus, MemoryStorageError>
     {
         match self.emails.get(message_id) {
-            Some(email) => Ok(email.clone()),
+            Some(internal_status) => Ok(internal_status.clone()),
             None => Err(MemoryStorageError::NotFound),
         }
     }

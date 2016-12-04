@@ -29,7 +29,7 @@ pub struct Recipient {
 
 /// An email to be sent (internal format)
 #[derive(Debug, Clone)]
-pub struct Email {
+pub struct InternalStatus {
     /// The originally submitted email
     pub rfc_email: RfcEmail,
 
@@ -47,9 +47,9 @@ pub struct Email {
     pub delivered_to_mx: Vec<SocketAddr>,
 }
 
-impl Email
+impl InternalStatus
 {
-    pub fn from_rfc_email(mut rfc_email: RfcEmail, helo_name: &str) -> Result<Email, Error>
+    pub fn from_rfc_email(mut rfc_email: RfcEmail, helo_name: &str) -> Result<InternalStatus, Error>
     {
         let message_id = match rfc_email.get_message_id() {
             Some(mid) => {
@@ -70,7 +70,7 @@ impl Email
         // Strip any Bcc header line (to make it blind)
         rfc_email.clear_bcc();
 
-        Ok(Email {
+        Ok(InternalStatus {
             rfc_email: rfc_email,
             message_id: message_id,
             recipients: recipients,

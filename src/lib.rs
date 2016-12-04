@@ -15,7 +15,7 @@ pub use worker::WorkerStatus;
 
 pub mod error;
 
-mod email;
+mod internal_status;
 
 pub mod storage;
 
@@ -31,7 +31,7 @@ use email_format::Email as RfcEmail;
 
 use worker::{Worker, Message};
 use error::Error;
-use email::Email;
+use internal_status::InternalStatus;
 use storage::MailstromStorage;
 
 
@@ -90,11 +90,12 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
     /// Send an email, getting back it's message-id
     pub fn send_email(&mut self, rfc_email: RfcEmail) -> Result<String, Error>
     {
-        let email = try!(Email::from_rfc_email(rfc_email, &*self.config.helo_name));
+        let internal_status = try!(InternalStatus::from_rfc_email(
+            rfc_email, &*self.config.helo_name));
 
-        let message_id = email.message_id.clone();
+        let message_id = internal_status.message_id.clone();
 
-        try!(self.sender.send(Message::SendEmail(email)));
+        try!(self.sender.send(Message::SendEmail(internal_status)));
 
         info!("Passed email {} off to worker", &*message_id);
 
