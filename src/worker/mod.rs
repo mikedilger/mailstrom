@@ -84,22 +84,27 @@ impl<S: MailstromStorage + 'static> Worker<S>
         let mut timeout: Duration = Duration::from_secs(60);
 
         loop {
+            debug!("(worker) waiting for a message ({} seconds)", timeout.as_secs());
+
             // Receive a message.  Waiting at most until the time when the next task
             // is due, or 60 seconds if there are no tasks
             match self.receiver.recv_timeout(timeout) {
                 Ok(message) => match message {
                     Message::SendEmail(email) => {
+                        debug!("(worker) received SendEmail command");
                         let worker_status = self.send_email(email);
                         if worker_status != WorkerStatus::Ok {
                             self.worker_status.store(worker_status as u8,
                                                      Ordering::SeqCst);
                         }
+                        info!("(worker) failed and terminated");
                         return;
                     }
                     Message::Terminate => {
-                        println!("Terminating");
+                        debug!("(worker) received Terminate command");
                         self.worker_status.store(
                             WorkerStatus::Terminated as u8, Ordering::SeqCst);
+                        info!("(worker) terminated");
                         return;
                     },
                 },
@@ -107,6 +112,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
                 Err(RecvTimeoutError::Disconnected) => {
                     self.worker_status.store(WorkerStatus::ChannelDisconnected as u8,
                                              Ordering::SeqCst);
+                    info!("(worker) failed and terminated");
                     return;
                 }
             };
@@ -122,6 +128,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
                 if worker_status != WorkerStatus::Ok {
                     self.worker_status.store(worker_status as u8,
                                              Ordering::SeqCst);
+                    debug!("(worker) failed and terminated");
                     return;
                 }
                 self.tasks.remove(task);
@@ -130,12 +137,14 @@ impl<S: MailstromStorage + 'static> Worker<S>
             // Recompute the timeout
             let now = Instant::now();
             timeout = if let Some(task) = self.tasks.iter().next() {
+                debug!("(worker) looping (tasks in queue)");
                 if task.time > now {
                     task.time - now
                 } else {
                     Duration::new(0,0) // overdue!
                 }
             } else {
+                debug!("(worker) looping (no tasks)");
                 Duration::from_secs(60)
             };
         }
@@ -170,6 +179,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
                 attempt = a + 1;
                 if a == 3 {
                     // Or fail if too many attempts
+                    debug!("(worker) delivery failed after 3 attempts.");
                     recipient.result = DeliveryResult::Failed(
                         format!("Failed after 3 attempts: {}", msg));
                     continue;
@@ -178,6 +188,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
 
             // Skip (and complete) if no MX servers
             if recipient.mx_servers.is_none() {
+                debug!("(worker) delivery failed (no valid MX records).");
                 recipient.result = DeliveryResult::Failed(
                     "MX records found but none are valid".to_owned());
                 continue;
@@ -191,6 +202,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
                 // Mark completed if this MX server is known to have been successfully
                 // delivered to already
                 if email.delivered_to_mx.contains(&mx_servers[i]) {
+                    debug!("(worker) delivery skipped (was delivered with other recipients).");
                     recipient.result = DeliveryResult::Delivered(
                         "[was delivered along with another recipients delivery]".to_owned());
                     continue 'next_recipient;
@@ -225,14 +237,14 @@ impl<S: MailstromStorage + 'static> Worker<S>
         let mut guard = match (*self.storage).write() {
             Ok(guard) => guard,
             Err(e) => {
-                println!("{:?}", e);
+                error!("{:?}", e);
                 return WorkerStatus::LockPoisoned;
             },
         };
 
         // Store the email delivery result (so far) into storage
         if let Err(e) = (*guard).store(&email) {
-            println!("{:?}", e);
+            error!("{:?}", e);
             return WorkerStatus::StorageWriteFailed;
         }
 
@@ -251,6 +263,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
     fn handle_task(&mut self, task: &Task) -> WorkerStatus {
         match task.tasktype {
             TaskType::Resend => {
+                debug!("(worker) resending a deferred email");
                 let email = {
                     let guard = match (*self.storage).read() {
                         Ok(guard) => guard,
@@ -258,7 +271,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
                     };
                     match (*guard).retrieve(&*task.message_id) {
                         Err(e) => {
-                            println!("Unable to retrieve task: {:?}", e);
+                            warn!("Unable to retrieve task: {:?}", e);
                             return WorkerStatus::Ok
                         },
                         Ok(email) => email
@@ -281,7 +294,7 @@ fn get_mx_records_for_email(email: &mut Email)
             Err(e) => {
                 recipient.result = DeliveryResult::Failed(
                     format!("Unable to fetch MX record: {:?}", e));
-                println!("MX LOOKUP FAILED FOR {}", recipient.email_addr);
+                warn!("MX LOOKUP FAILED FOR {}", recipient.email_addr);
                 continue;
             }
             Ok(records) => {
@@ -289,8 +302,8 @@ fn get_mx_records_for_email(email: &mut Email)
                 for record in records {
                     match (&*record, 25_u16).to_socket_addrs() {
                         Err(_) => {
-                            println!("ToSocketAddr FAILED FOR {}: {}",
-                                     recipient.email_addr,
+                            warn!("ToSocketAddr FAILED FOR {}: {}",
+                                  recipient.email_addr,
                                      &*record);
                             continue; // MX record invalid?
                         },
@@ -309,9 +322,9 @@ fn get_mx_records_for_email(email: &mut Email)
             }
         };
         recipient.mx_servers = Some(mx_records);
-        println!("DEBUG: got mx servers for {}: {:?}",
-                 recipient.email_addr,
-                 recipient.mx_servers.as_ref().unwrap());
+        debug!("DEBUG: got mx servers for {}: {:?}",
+               recipient.email_addr,
+               recipient.mx_servers.as_ref().unwrap());
     }
 }
 

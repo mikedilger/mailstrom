@@ -5,6 +5,7 @@ extern crate uuid;
 extern crate email_format;
 extern crate resolv;
 extern crate lettre;
+#[macro_use] extern crate log;
 
 #[cfg(test)]
 mod tests;
@@ -96,6 +97,8 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
 
         try!(self.sender.send(Message::SendEmail(email)));
 
+        info!("Passed email {} off to worker", &*message_id);
+
         Ok(message_id)
     }
 
@@ -116,6 +119,7 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
 impl<S: MailstromStorage + 'static> Drop for Mailstrom<S>
 {
     fn drop(&mut self) {
+        info!("Mailstrom is terminating.");
         let _ = self.sender.send(Message::Terminate);
     }
 }

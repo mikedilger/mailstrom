@@ -104,6 +104,7 @@ pub fn mx_delivery(email: &RfcEmail, message_id: String, mx_server: &SocketAddr,
 
     let result = match mailer.send(semail) {
         Ok(response) => {
+            info!("(worker) delivery response: {:?}", response);
             match response.severity() {
                 Severity::PositiveCompletion | Severity::PositiveIntermediate => {
                     DeliveryResult::Delivered( format!("{:?}", response) )
@@ -117,16 +118,20 @@ pub fn mx_delivery(email: &RfcEmail, message_id: String, mx_server: &SocketAddr,
             }
         },
         Err(LettreSmtpError::Transient(response)) => {
+            info!("(worker) delivery failed response: {:?}", response);
             DeliveryResult::Deferred( attempt, format!("{:?}", response) )
         },
         Err(LettreSmtpError::Permanent(response)) => {
+            info!("(worker) delivery failed response: {:?}", response);
             DeliveryResult::Failed( format!("{:?}", response) )
         },
         Err(LettreSmtpError::Resolution) => {
+            info!("(worker) delivery failed: DNS resolution failed");
             DeliveryResult::Deferred( attempt, "DNS resolution failed".to_owned() )
         },
         // FIXME: certain LettreSmtpError::Io errors may also be transient.
         Err(e) => {
+            info!("(worker) delivery failed response: {:?}", e);
             DeliveryResult::Failed( format!("{:?}", e) )
         },
     };
