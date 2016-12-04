@@ -49,7 +49,7 @@ pub struct InternalStatus {
 
 impl InternalStatus
 {
-    pub fn from_email(mut email: Email, helo_name: &str) -> Result<InternalStatus, Error>
+    pub fn create(mut email: Email, helo_name: &str) -> Result<InternalStatus, Error>
     {
         let message_id = match email.get_message_id() {
             Some(mid) => {

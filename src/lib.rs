@@ -90,7 +90,7 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
     /// Send an email, getting back it's message-id
     pub fn send_email(&mut self, email: Email) -> Result<String, Error>
     {
-        let internal_status = try!(InternalStatus::from_email(
+        let internal_status = try!(InternalStatus::create(
             email, &*self.config.helo_name));
 
         let message_id = internal_status.message_id.clone();
