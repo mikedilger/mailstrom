@@ -211,7 +211,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
 
                 // Attempt delivery to this MX server
                 recipient.result = ::worker::delivery::mx_delivery(
-                    &internal_status.rfc_email, internal_status.message_id.clone(),
+                    &internal_status.email, internal_status.message_id.clone(),
                     &mx_servers[i], &*self.helo_name, attempt);
 
                 match recipient.result {

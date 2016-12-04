@@ -27,7 +27,7 @@ use std::sync::{mpsc, Arc, RwLock};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::thread;
 use std::ops::Drop;
-use email_format::Email as RfcEmail;
+use email_format::Email;
 
 use worker::{Worker, Message};
 use error::Error;
@@ -88,10 +88,10 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
     }
 
     /// Send an email, getting back it's message-id
-    pub fn send_email(&mut self, rfc_email: RfcEmail) -> Result<String, Error>
+    pub fn send_email(&mut self, email: Email) -> Result<String, Error>
     {
-        let internal_status = try!(InternalStatus::from_rfc_email(
-            rfc_email, &*self.config.helo_name));
+        let internal_status = try!(InternalStatus::from_email(
+            email, &*self.config.helo_name));
 
         let message_id = internal_status.message_id.clone();
 

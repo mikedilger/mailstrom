@@ -4,19 +4,19 @@ use lettre::transport::smtp::response::Severity;
 use lettre::transport::smtp::error::Error as LettreSmtpError;
 use lettre::transport::EmailTransport;
 use status::DeliveryResult;
-use email_format::Email as RfcEmail;
+use email_format::Email;
 use email_format::rfc5322::types::{Mailbox, Address, GroupList};
 
 // Implement lettre's SendableEmail
 
 struct SEmail<'a> {
-    rfc_email: &'a RfcEmail,
+    email: &'a Email,
     message_id: String,
 }
 
 impl<'a> ::lettre::email::SendableEmail for SEmail<'a> {
     fn from_address(&self) -> String {
-        match self.rfc_email.get_sender() {
+        match self.email.get_sender() {
             // Use sender if available
             Some(sender) => match sender.0 {
                 Mailbox::NameAddr(ref na) =>
@@ -24,7 +24,7 @@ impl<'a> ::lettre::email::SendableEmail for SEmail<'a> {
                 Mailbox::AddrSpec(ref aspec) =>
                     format!("{}", aspec).trim().to_owned(),
             },
-            None => match (self.rfc_email.get_from().0).0[0] {
+            None => match (self.email.get_from().0).0[0] {
                 Mailbox::NameAddr(ref na) =>
                     format!("{}", na.angle_addr.addr_spec).trim().to_owned(),
                 Mailbox::AddrSpec(ref aspec) =>
@@ -35,7 +35,7 @@ impl<'a> ::lettre::email::SendableEmail for SEmail<'a> {
     fn to_addresses(&self) -> Vec<String> {
         let mut output: Vec<String> = Vec::new();
 
-        if let Some(to) = self.rfc_email.get_to() {
+        if let Some(to) = self.email.get_to() {
             for addr in (to.0).0.iter() {
                 match addr {
                     &Address::Mailbox(ref mb) => {
@@ -71,7 +71,7 @@ impl<'a> ::lettre::email::SendableEmail for SEmail<'a> {
         output
     }
     fn message(&self) -> String {
-        format!("{}", self.rfc_email)
+        format!("{}", self.email)
     }
     fn message_id(&self) -> String {
         format!("{}", self.message_id)
@@ -79,7 +79,7 @@ impl<'a> ::lettre::email::SendableEmail for SEmail<'a> {
 }
 
 // Deliver an email to an MX server
-pub fn mx_delivery(email: &RfcEmail, message_id: String, mx_server: &SocketAddr,
+pub fn mx_delivery(email: &Email, message_id: String, mx_server: &SocketAddr,
                    helo: &str, attempt: u8)
                    -> DeliveryResult
 {
@@ -98,7 +98,7 @@ pub fn mx_delivery(email: &RfcEmail, message_id: String, mx_server: &SocketAddr,
         .build();
 
     let semail = SEmail {
-        rfc_email: email,
+        email: email,
         message_id: message_id,
     };;
 
