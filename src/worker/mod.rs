@@ -96,9 +96,9 @@ impl<S: MailstromStorage + 'static> Worker<S>
                         if worker_status != WorkerStatus::Ok {
                             self.worker_status.store(worker_status as u8,
                                                      Ordering::SeqCst);
+                            info!("(worker) failed and terminated");
+                            return;
                         }
-                        info!("(worker) failed and terminated");
-                        return;
                     }
                     Message::Terminate => {
                         debug!("(worker) received Terminate command");
