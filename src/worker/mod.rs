@@ -1,15 +1,18 @@
 
 mod delivery;
+mod task;
 
 use std::sync::{Arc, RwLock};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::atomic::{AtomicU8, Ordering};
-use std::time::Duration;
+use std::collections::BTreeSet;
+use std::time::{Duration, Instant};
 use std::net::SocketAddr;
 
 use email::{Email, DeliveryResult};
 use storage::MailstromStorage;
 use error::Error;
+use self::task::{Task, TaskType};
 
 pub enum Message {
     /// Ask the worker to deliver an email
@@ -51,6 +54,9 @@ pub struct Worker<S: MailstromStorage + 'static>
 
     // Persistent shared storage
     storage: Arc<RwLock<S>>,
+
+    // A list of tasks we need to do later, sorted in time order
+    tasks: BTreeSet<Task>
 }
 
 impl<S: MailstromStorage + 'static> Worker<S>
@@ -66,14 +72,20 @@ impl<S: MailstromStorage + 'static> Worker<S>
             worker_status: worker_status,
             helo_name: helo_name.to_owned(),
             storage: storage,
+            tasks: BTreeSet::new(),
         }
     }
 
     pub fn run(&mut self) {
 
-        let timeout: Duration = Duration::from_secs(60);
+        // This timeout represents how long we wait for a message.  If there are any
+        // tasks in the tasklist, this will be the tiem until the first task is
+        // due, unless that surpasses 60 seconds.
+        let mut timeout: Duration = Duration::from_secs(60);
 
         loop {
+            // Receive a message.  Waiting at most until the time when the next task
+            // is due, or 60 seconds, whichever is less
             match self.receiver.recv_timeout(timeout) {
                 Ok(message) => match message {
                     Message::SendEmail(email) => {
@@ -99,6 +111,33 @@ impl<S: MailstromStorage + 'static> Worker<S>
                 }
             };
 
+            // Copy out all the tasks that are due
+            let now = Instant::now();
+            let due_tasks: Vec<Task> = self.tasks.iter()
+                .filter(|t| now > t.time).cloned().collect();
+
+            // Handle all these due tasks
+            for task in &due_tasks {
+                let worker_status = self.handle_task(task);
+                if worker_status != WorkerStatus::Ok {
+                    self.worker_status.store(worker_status as u8,
+                                             Ordering::SeqCst);
+                    return;
+                }
+                self.tasks.remove(task);
+            }
+
+            // Recompute the timeout
+            let now = Instant::now();
+            timeout = if let Some(task) = self.tasks.iter().next() {
+                if task.time > now {
+                    task.time - now
+                } else {
+                    Duration::new(0,0) // overdue!
+                }
+            } else {
+                Duration::from_secs(60)
+            };
         }
     }
 
@@ -191,6 +230,15 @@ impl<S: MailstromStorage + 'static> Worker<S>
             return WorkerStatus::StorageWriteFailed;
         }
 
+        WorkerStatus::Ok
+    }
+
+    fn handle_task(&mut self, task: &Task) -> WorkerStatus {
+        match task.tasktype {
+            TaskType::Resend => {
+                // FIXME, resent should happen here
+            },
+        }
         WorkerStatus::Ok
     }
 }
