@@ -80,12 +80,12 @@ impl<S: MailstromStorage + 'static> Worker<S>
 
         // This timeout represents how long we wait for a message.  If there are any
         // tasks in the tasklist, this will be the tiem until the first task is
-        // due, unless that surpasses 60 seconds.
+        // due.  Otherwise it is set to 60 seconds.
         let mut timeout: Duration = Duration::from_secs(60);
 
         loop {
             // Receive a message.  Waiting at most until the time when the next task
-            // is due, or 60 seconds, whichever is less
+            // is due, or 60 seconds if there are no tasks
             match self.receiver.recv_timeout(timeout) {
                 Ok(message) => match message {
                     Message::SendEmail(email) => {
@@ -144,6 +144,8 @@ impl<S: MailstromStorage + 'static> Worker<S>
     fn send_email(&mut self, mut email: Email) -> WorkerStatus
     {
         get_mx_records_for_email(&mut email);
+
+        let mut some_deferred_with_attempts: Option<u8> = None;
 
         'next_recipient:
         for recipient in &mut email.recipients {
@@ -213,6 +215,10 @@ impl<S: MailstromStorage + 'static> Worker<S>
                     }
                 }
             }
+
+            if let DeliveryResult::Deferred(a, _) = recipient.result {
+                some_deferred_with_attempts = Some(a);
+            }
         }
 
         // Lock the storage
@@ -230,16 +236,37 @@ impl<S: MailstromStorage + 'static> Worker<S>
             return WorkerStatus::StorageWriteFailed;
         }
 
+        if let Some(attempts) = some_deferred_with_attempts {
+            // Create a new worker task to retry later
+            self.tasks.insert( Task {
+                tasktype: TaskType::Resend,
+                time: Instant::now() + Duration::from_secs(60 * 3u64.pow(attempts as u32)),
+                message_id: email.message_id.clone(),
+            });
+        }
+
         WorkerStatus::Ok
     }
 
     fn handle_task(&mut self, task: &Task) -> WorkerStatus {
         match task.tasktype {
             TaskType::Resend => {
-                // FIXME, resent should happen here
+                let email = {
+                    let guard = match (*self.storage).read() {
+                        Ok(guard) => guard,
+                        Err(_) => return WorkerStatus::LockPoisoned,
+                    };
+                    match (*guard).retrieve(&*task.message_id) {
+                        Err(e) => {
+                            println!("Unable to retrieve task: {:?}", e);
+                            return WorkerStatus::Ok
+                        },
+                        Ok(email) => email
+                    }
+                };
+                return self.send_email(email);
             },
         }
-        WorkerStatus::Ok
     }
 }
 
