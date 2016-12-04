@@ -3,7 +3,7 @@ use lettre::transport::smtp::{SmtpTransportBuilder, SecurityLevel};
 use lettre::transport::smtp::response::Severity;
 use lettre::transport::smtp::error::Error as LettreSmtpError;
 use lettre::transport::EmailTransport;
-use email::DeliveryResult;
+use status::DeliveryResult;
 use email_format::Email as RfcEmail;
 use email_format::rfc5322::types::{Mailbox, Address, GroupList};
 

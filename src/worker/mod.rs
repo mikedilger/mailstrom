@@ -9,7 +9,8 @@ use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 use std::net::SocketAddr;
 
-use email::{Email, DeliveryResult};
+use email::Email;
+use status::DeliveryResult;
 use storage::MailstromStorage;
 use error::Error;
 use self::task::{Task, TaskType};

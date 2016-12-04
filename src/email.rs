@@ -5,25 +5,7 @@ use email_format::Email as RfcEmail;
 use email_format::rfc5322::headers::Bcc;
 use email_format::rfc5322::types::{AddressList, Address, GroupList, Mailbox};
 use error::Error;
-use status::{Status, RecipientStatus};
-
-/// The result (so far) of the sending of an email to a particular recipient
-#[derive(Debug, Clone, PartialEq)]
-pub enum DeliveryResult {
-    /// Mail is queued to be sent, but no attempt has yet been made to send. This state should
-    /// be moved through rather quickly.
-    Queued,
-
-    /// Mail sending has been deferred due to a transient error. Number of attempts and Error
-    /// are included.
-    Deferred(u8, String),
-
-    /// Mail has been sent. Delivery response included.
-    Delivered(String),
-
-    /// Mail sending has failed due to a permanent error. Error is included.
-    Failed(String),
-}
+use status::{Status, RecipientStatus, DeliveryResult};
 
 /// Information about the recipients of an email to be sent
 #[derive(Debug, Clone)]

@@ -16,12 +16,11 @@ pub use worker::WorkerStatus;
 pub mod error;
 
 mod email;
-pub use email::DeliveryResult;
 
 pub mod storage;
 
 pub mod status;
-pub use status::Status;
+pub use status::{Status, DeliveryResult};
 
 
 use std::sync::{mpsc, Arc, RwLock};
