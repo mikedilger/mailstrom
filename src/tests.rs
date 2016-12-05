@@ -1,7 +1,6 @@
 
 extern crate env_logger;
 
-use email_format::Email;
 use {Mailstrom, WorkerStatus, Config};
 use storage::MemoryStorage;
 
@@ -16,8 +15,14 @@ fn test_terminate() {
     assert_eq!( mailstrom.worker_status(), WorkerStatus::Terminated );
 }
 
+/*
+// We cannot run such a test without actually sending mail to some SMTP server.
+// We will work out how to fake this in a future release
 #[test]
 fn test_submit_email() {
+
+    use email_format::Email;
+
     let mut mailstrom = Mailstrom::new(Config { helo_name: "localhost".to_owned() },
                                        MemoryStorage::new());
 
@@ -38,3 +43,4 @@ fn test_submit_email() {
 
     assert!( mailstrom.send_email(email).is_ok() );
 }
+ */
