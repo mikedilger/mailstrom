@@ -8,7 +8,7 @@ use error::Error;
 use status::{Status, RecipientStatus, DeliveryResult};
 
 /// Information about the recipients of an email to be sent
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Recipient {
     /// The recipient's email address
     pub email_addr: String,
@@ -28,7 +28,7 @@ pub struct Recipient {
 }
 
 /// An email to be sent (internal format)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InternalStatus {
     /// The parsed-out (or generated) message ID
     pub message_id: String,

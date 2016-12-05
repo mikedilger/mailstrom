@@ -1,11 +1,13 @@
 
 #![feature(integer_atomics)]
+#![feature(proc_macro)]
 
 extern crate uuid;
 extern crate email_format;
 extern crate resolv;
 extern crate lettre;
 #[macro_use] extern crate log;
+#[macro_use] extern crate serde_derive;
 
 #[cfg(test)]
 mod tests;

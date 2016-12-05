@@ -1,6 +1,6 @@
 
 /// The result (so far) of the sending of an email to a particular recipient
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum DeliveryResult {
     /// Mail is queued to be sent, but no attempt has yet been made to send. This state should
     /// be moved through rather quickly.
@@ -17,13 +17,13 @@ pub enum DeliveryResult {
     Failed(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct RecipientStatus {
     pub recipient: String,
     pub result: DeliveryResult,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Status {
     pub message_id: String,
     pub recipient_status: Vec<RecipientStatus>,
