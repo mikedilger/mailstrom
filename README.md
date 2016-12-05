@@ -1,5 +1,7 @@
 # Mailstrom
 
+[Documentation](https://mikedilger.github.io/mailstrom)
+
 `Mailstrom` is a rust library that handles email delivery for rust programs in a
 background worker thread.  It does the following:
 
