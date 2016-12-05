@@ -1,6 +1,6 @@
 [package]
 name = "mailstrom"
-version = "0.1.0"
+version = "0.2.0-unstable"
 authors = ["Mike Dilger <mike@optcomp.nz>"]
 
 [dev-dependencies]
