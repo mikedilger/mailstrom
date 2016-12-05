@@ -17,7 +17,9 @@ pub use worker::WorkerStatus;
 
 pub mod error;
 
-mod internal_status;
+/// This is exposed for implementers of `MailstromStorage` but otherwise should not
+/// be needed by users of this library.
+pub mod internal_status;
 
 mod storage;
 
@@ -33,7 +35,7 @@ use email_format::Email;
 
 use worker::{Worker, Message};
 use error::Error;
-pub use internal_status::{InternalStatus, Recipient};
+use internal_status::InternalStatus;
 pub use storage::{MailstromStorage, MailstromStorageError, MemoryStorage};
 
 

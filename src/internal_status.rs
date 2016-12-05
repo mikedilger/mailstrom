@@ -27,7 +27,8 @@ pub struct Recipient {
     pub result: DeliveryResult,
 }
 
-/// An email to be sent (internal format)
+/// An email to be sent (internal format).  This is exposed publicly for
+/// implementers of `MailstromStorage`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InternalStatus {
     /// The parsed-out (or generated) message ID
