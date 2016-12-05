@@ -19,7 +19,7 @@ pub mod error;
 
 mod internal_status;
 
-pub mod storage;
+mod storage;
 
 pub mod status;
 pub use status::{Status, DeliveryResult};
@@ -33,8 +33,8 @@ use email_format::Email;
 
 use worker::{Worker, Message};
 use error::Error;
-use internal_status::InternalStatus;
-use storage::MailstromStorage;
+pub use internal_status::{InternalStatus, Recipient};
+pub use storage::{MailstromStorage, MailstromStorageError, MemoryStorage};
 
 
 pub struct Config
