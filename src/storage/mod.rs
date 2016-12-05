@@ -2,6 +2,7 @@
 pub mod memory_storage;
 pub use self::memory_storage::MemoryStorage;
 
+use email_format::Email;
 use internal_status::InternalStatus;
 
 pub trait MailstromStorageError: ::std::error::Error { }
@@ -11,8 +12,16 @@ pub trait MailstromStorage: Send + Sync {
     type Error: MailstromStorageError;
 
     /// Store an `Email`.  This should overwrite if message-id matches an existing email.
-    fn store(&mut self, internal_status: &InternalStatus) -> Result<(), Self::Error>;
+    fn store(&mut self, email: &Email, internal_status: &InternalStatus)
+             -> Result<(), Self::Error>;
 
-    /// Retrieve an `Email` based on the message_id
-    fn retrieve(&self, message_id: &str) -> Result<InternalStatus, Self::Error>;
+    /// Update the status of an email
+    fn update_status(&mut self, internal_status: &InternalStatus)
+             -> Result<(), Self::Error>;
+
+    /// Retrieve an `Email` and `InternalStatus` based on the message_id
+    fn retrieve(&self, message_id: &str) -> Result<(Email, InternalStatus), Self::Error>;
+
+    /// Retrieve an `InternalStatus` based on the message_id
+    fn retrieve_status(&self, message_id: &str) -> Result<InternalStatus, Self::Error>;
 }

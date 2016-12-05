@@ -30,9 +30,6 @@ pub struct Recipient {
 /// An email to be sent (internal format)
 #[derive(Debug, Clone)]
 pub struct InternalStatus {
-    /// The originally submitted email
-    pub email: Email,
-
     /// The parsed-out (or generated) message ID
     pub message_id: String,
 
@@ -49,7 +46,8 @@ pub struct InternalStatus {
 
 impl InternalStatus
 {
-    pub fn create(mut email: Email, helo_name: &str) -> Result<InternalStatus, Error>
+    pub fn create(mut email: Email, helo_name: &str)
+                  -> Result<(InternalStatus, Email), Error>
     {
         let message_id = match email.get_message_id() {
             Some(mid) => {
@@ -70,12 +68,11 @@ impl InternalStatus
         // Strip any Bcc header line (to make it blind)
         email.clear_bcc();
 
-        Ok(InternalStatus {
-            email: email,
+        Ok((InternalStatus {
             message_id: message_id,
             recipients: recipients,
             delivered_to_mx: Vec::new(),
-        })
+        }, email))
     }
 
     pub fn as_status(&self) -> Status

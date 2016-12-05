@@ -90,12 +90,12 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
     /// Send an email, getting back it's message-id
     pub fn send_email(&mut self, email: Email) -> Result<String, Error>
     {
-        let internal_status = try!(InternalStatus::create(
+        let (internal_status, email) = try!(InternalStatus::create(
             email, &*self.config.helo_name));
 
         let message_id = internal_status.message_id.clone();
 
-        try!(self.sender.send(Message::SendEmail(internal_status)));
+        try!(self.sender.send(Message::SendEmail(email, internal_status)));
 
         info!("Passed email {} off to worker", &*message_id);
 
@@ -110,9 +110,9 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
             Err(_) => return Err(Error::Lock),
         };
 
-        let email = try!((*guard).retrieve(message_id));
+        let status = try!((*guard).retrieve_status(message_id));
 
-        Ok(email.as_status())
+        Ok(status.as_status())
     }
 }
 

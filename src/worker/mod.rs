@@ -9,6 +9,7 @@ use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 use std::net::SocketAddr;
 
+use email_format::Email;
 use internal_status::InternalStatus;
 use status::DeliveryResult;
 use storage::MailstromStorage;
@@ -17,7 +18,7 @@ use self::task::{Task, TaskType};
 
 pub enum Message {
     /// Ask the worker to deliver an email
-    SendEmail(InternalStatus),
+    SendEmail(Email, InternalStatus),
     /// Ask the worker to terminate
     Terminate,
 }
@@ -91,9 +92,9 @@ impl<S: MailstromStorage + 'static> Worker<S>
             // is due, or 60 seconds if there are no tasks
             match self.receiver.recv_timeout(timeout) {
                 Ok(message) => match message {
-                    Message::SendEmail(internal_status) => {
+                    Message::SendEmail(email, internal_status) => {
                         debug!("(worker) received SendEmail command");
-                        let worker_status = self.send_email(internal_status);
+                        let worker_status = self.send_email(email, internal_status);
                         if worker_status != WorkerStatus::Ok {
                             self.worker_status.store(worker_status as u8,
                                                      Ordering::SeqCst);
@@ -151,7 +152,8 @@ impl<S: MailstromStorage + 'static> Worker<S>
         }
     }
 
-    fn send_email(&mut self, mut internal_status: InternalStatus) -> WorkerStatus
+    fn send_email(&mut self, email: Email, mut internal_status: InternalStatus)
+                  -> WorkerStatus
     {
         get_mx_records_for_email(&mut internal_status);
 
@@ -211,7 +213,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
 
                 // Attempt delivery to this MX server
                 recipient.result = ::worker::delivery::mx_delivery(
-                    &internal_status.email, internal_status.message_id.clone(),
+                    &email, internal_status.message_id.clone(),
                     &mx_servers[i], &*self.helo_name, attempt);
 
                 match recipient.result {
@@ -244,7 +246,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
         };
 
         // Store the email delivery result (so far) into storage
-        if let Err(e) = (*guard).store(&internal_status) {
+        if let Err(e) = (*guard).store(&email, &internal_status) {
             error!("{:?}", e);
             return WorkerStatus::StorageWriteFailed;
         }
@@ -265,7 +267,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
         match task.tasktype {
             TaskType::Resend => {
                 debug!("(worker) resending a deferred email");
-                let internal_status = {
+                let (email, internal_status) = {
                     let guard = match (*self.storage).read() {
                         Ok(guard) => guard,
                         Err(_) => return WorkerStatus::LockPoisoned,
@@ -275,10 +277,10 @@ impl<S: MailstromStorage + 'static> Worker<S>
                             warn!("Unable to retrieve task: {:?}", e);
                             return WorkerStatus::Ok
                         },
-                        Ok(internal_status) => internal_status
+                        Ok(x) => x
                     }
                 };
-                return self.send_email(internal_status);
+                return self.send_email(email, internal_status);
             },
         }
     }
