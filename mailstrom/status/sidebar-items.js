@@ -1,0 +1,1 @@
+initSidebarItems({"enum":[["DeliveryResult","The result (so far) of the sending of an email to a particular recipient"]],"struct":[["RecipientStatus",""],["Status",""]]});

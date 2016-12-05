@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `Mailstrom` struct in crate `mailstrom`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, Mailstrom">
+
+    <title>mailstrom::Mailstrom - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../main.css">
+    
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'><a href='index.html'>mailstrom</a></p><script>window.sidebarCurrent = {name: 'Mailstrom', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content struct">
+<h1 class='fqn'><span class='in-band'>Struct <a href='index.html'>mailstrom</a>::<wbr><a class='struct' href=''>Mailstrom</a></span><span class='out-of-band'><span id='render-detail'>
+                   <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                       [<span class='inner'>&#x2212;</span>]
+                   </a>
+               </span><a class='srclink' href='../src/mailstrom/lib.rs.html#91-97' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct Mailstrom&lt;S:&nbsp;<a class='trait' href='../mailstrom/trait.MailstromStorage.html' title='mailstrom::MailstromStorage'>MailstromStorage</a> + 'static&gt; { /* fields omitted */ }</pre><h2 id='methods'>Methods</h2><h3 class='impl'><span class='in-band'><code>impl&lt;S:&nbsp;<a class='trait' href='../mailstrom/trait.MailstromStorage.html' title='mailstrom::MailstromStorage'>MailstromStorage</a> + 'static&gt; <a class='struct' href='../mailstrom/struct.Mailstrom.html' title='mailstrom::Mailstrom'>Mailstrom</a>&lt;S&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../src/mailstrom/lib.rs.html#99-165' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.new' class='method'><span id='new.v' class='invisible'><code>fn <a href='#method.new' class='fnname'>new</a>(config: <a class='struct' href='../mailstrom/struct.Config.html' title='mailstrom::Config'>Config</a>, storage: S) -&gt; <a class='struct' href='../mailstrom/struct.Mailstrom.html' title='mailstrom::Mailstrom'>Mailstrom</a>&lt;S&gt;</code></span></h4>
+<div class='docblock'><p>Create a new Mailstrom instance for sending emails.</p>
+</div><h4 id='method.die' class='method'><span id='die.v' class='invisible'><code>fn <a href='#method.die' class='fnname'>die</a>(&amp;mut self) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.tuple.html'>()</a>, <a class='enum' href='../mailstrom/error/enum.Error.html' title='mailstrom::error::Error'>Error</a>&gt;</code></span></h4>
+<div class='docblock'><p>Ask Mailstrom to die.  This is not required, you can simply let it fall out
+of scope and it will clean itself up.</p>
+</div><h4 id='method.worker_status' class='method'><span id='worker_status.v' class='invisible'><code>fn <a href='#method.worker_status' class='fnname'>worker_status</a>(&amp;self) -&gt; <a class='enum' href='../mailstrom/enum.WorkerStatus.html' title='mailstrom::WorkerStatus'>WorkerStatus</a></code></span></h4>
+<div class='docblock'><p>Determine the status of the worker</p>
+</div><h4 id='method.send_email' class='method'><span id='send_email.v' class='invisible'><code>fn <a href='#method.send_email' class='fnname'>send_email</a>(&amp;mut self, email: Email) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>, <a class='enum' href='../mailstrom/error/enum.Error.html' title='mailstrom::error::Error'>Error</a>&gt;</code></span></h4>
+<div class='docblock'><p>Send an email, getting back it&#39;s message-id</p>
+</div><h4 id='method.query_status' class='method'><span id='query_status.v' class='invisible'><code>fn <a href='#method.query_status' class='fnname'>query_status</a>(&amp;mut self, message_id: &amp;<a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.str.html'>str</a>) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/result/enum.Result.html' title='core::result::Result'>Result</a>&lt;<a class='struct' href='../mailstrom/status/struct.Status.html' title='mailstrom::status::Status'>Status</a>, <a class='enum' href='../mailstrom/error/enum.Error.html' title='mailstrom::error::Error'>Error</a>&gt;</code></span></h4>
+</div><h2 id='implementations'>Trait Implementations</h2><h3 class='impl'><span class='in-band'><code>impl&lt;S:&nbsp;<a class='trait' href='../mailstrom/trait.MailstromStorage.html' title='mailstrom::MailstromStorage'>MailstromStorage</a> + 'static&gt; <a class='trait' href='https://doc.rust-lang.org/nightly/core/ops/trait.Drop.html' title='core::ops::Drop'>Drop</a> for <a class='struct' href='../mailstrom/struct.Mailstrom.html' title='mailstrom::Mailstrom'>Mailstrom</a>&lt;S&gt;</code></span><span class='out-of-band'><div class='ghost'></div><a class='srclink' href='../src/mailstrom/lib.rs.html#167-173' title='goto source code'>[src]</a></span></h3>
+<div class='impl-items'><h4 id='method.drop' class='method'><span id='drop.v' class='invisible'><code>fn <a href='https://doc.rust-lang.org/nightly/core/ops/trait.Drop.html#tymethod.drop' class='fnname'>drop</a>(&amp;mut self)</code></span></h4>
+<div class='docblock'><p>A method called when the value goes out of scope. <a href="https://doc.rust-lang.org/nightly/core/ops/trait.Drop.html#tymethod.drop">Read more</a></p>
+</div></div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                    <dt>+</dt>
+                    <dd>Collapse/expand all sections</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../";
+        window.currentCrate = "mailstrom";
+    </script>
+    <script src="../jquery.js"></script>
+    <script src="../main.js"></script>
+    <script defer src="../search-index.js"></script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["InternalStatus","An email to be sent (internal format).  This is exposed publicly for implementers of `MailstromStorage`"],["Recipient","Information about the recipients of an email to be sent"]]});

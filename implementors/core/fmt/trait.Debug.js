@@ -1,0 +1,10 @@
+(function() {var implementors = {};
+implementors["mailstrom"] = ["impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html' title='core::fmt::Debug'>Debug</a> for <a class='enum' href='mailstrom/enum.WorkerStatus.html' title='mailstrom::WorkerStatus'>WorkerStatus</a>","impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html' title='core::fmt::Debug'>Debug</a> for <a class='enum' href='mailstrom/error/enum.Error.html' title='mailstrom::error::Error'>Error</a>","impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html' title='core::fmt::Debug'>Debug</a> for <a class='struct' href='mailstrom/internal_status/struct.Recipient.html' title='mailstrom::internal_status::Recipient'>Recipient</a>","impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html' title='core::fmt::Debug'>Debug</a> for <a class='struct' href='mailstrom/internal_status/struct.InternalStatus.html' title='mailstrom::internal_status::InternalStatus'>InternalStatus</a>","impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html' title='core::fmt::Debug'>Debug</a> for <a class='enum' href='mailstrom/status/enum.DeliveryResult.html' title='mailstrom::status::DeliveryResult'>DeliveryResult</a>","impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html' title='core::fmt::Debug'>Debug</a> for <a class='struct' href='mailstrom/status/struct.RecipientStatus.html' title='mailstrom::status::RecipientStatus'>RecipientStatus</a>","impl <a class='trait' href='https://doc.rust-lang.org/nightly/core/fmt/trait.Debug.html' title='core::fmt::Debug'>Debug</a> for <a class='struct' href='mailstrom/status/struct.Status.html' title='mailstrom::status::Status'>Status</a>",];
+
+            if (window.register_implementors) {
+                window.register_implementors(implementors);
+            } else {
+                window.pending_implementors = implementors;
+            }
+        
+})()
