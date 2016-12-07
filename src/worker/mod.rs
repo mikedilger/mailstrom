@@ -207,12 +207,6 @@ impl<S: MailstromStorage + 'static> Worker<S>
                 // delivered to already
                 // THIS DOES NOT WORK DUE TO THE RECIPIENTS PREVIOUSLY NOT INCLUDING THIS
                 // CURRENT RECIPIENT: SEE BUG #3
-                if internal_status.delivered_to_mx.contains(&mx_servers[i]) {
-                    debug!("(worker) delivery skipped (was delivered with other recipients).");
-                    recipient.result = DeliveryResult::Delivered(
-                        "[was delivered along with another recipients delivery]".to_owned());
-                    continue 'next_recipient;
-                }
                  */
 
                 // Attempt delivery to this MX server
@@ -221,17 +215,8 @@ impl<S: MailstromStorage + 'static> Worker<S>
                     &mx_servers[i], &*self.helo_name, attempt);
 
                 match recipient.result {
-                    DeliveryResult::Delivered(_) => {
-                        // save in delivered_to_mx list
-                        internal_status.delivered_to_mx.push(mx_servers[i].clone());
-                        // Exit mx loop
-                        break;
-                    },
                     DeliveryResult::Deferred(_,_) => { } // continue MX loop
-                    _ => {
-                        // Exit mx loop
-                        break;
-                    }
+                    _ => break, // Exit mx loop
                 }
             }
 

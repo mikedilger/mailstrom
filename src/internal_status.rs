@@ -38,11 +38,6 @@ pub struct InternalStatus {
     /// is None, then the recipient information has not been determined yet
     /// (MX record lookups take some time).
     pub recipients: Vec<Recipient>,
-
-    /// The MX servers which we have successfully delivered to.  We keep
-    /// this as a separate list so we can more easily detect the situation
-    /// where multiple recipients deliveries go to the same MX
-    pub delivered_to_mx: Vec<SocketAddr>,
 }
 
 impl InternalStatus
@@ -72,7 +67,6 @@ impl InternalStatus
         Ok((InternalStatus {
             message_id: message_id,
             recipients: recipients,
-            delivered_to_mx: Vec::new(),
         }, email))
     }
 
