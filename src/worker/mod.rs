@@ -95,7 +95,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
                 Ok(message) => match message {
                     Message::SendEmail(email, internal_status) => {
                         debug!("(worker) received SendEmail command");
-                        let worker_status = self.send_email(email, internal_status);
+                        let worker_status = self.send_email(email, internal_status, true);
                         if worker_status != WorkerStatus::Ok {
                             self.worker_status.store(worker_status as u8,
                                                      Ordering::SeqCst);
@@ -153,22 +153,24 @@ impl<S: MailstromStorage + 'static> Worker<S>
         }
     }
 
-    fn send_email(&mut self, email: Email, mut internal_status: InternalStatus)
+    fn send_email(&mut self, email: Email, mut internal_status: InternalStatus, initial: bool)
                   -> WorkerStatus
     {
-        // Initial storage of the email
-        let status = self.update_storage(&email, &internal_status);
-        if status != WorkerStatus::Ok {
-            return status;
-        }
+        if initial {
+            // Initial storage of the email
+            let status = self.update_storage(&email, &internal_status);
+            if status != WorkerStatus::Ok {
+                return status;
+            }
 
-        // Get MX records for each recipient
-        ::worker::mx::get_mx_records_for_email(&mut internal_status);
+            // Get MX records for each recipient
+            ::worker::mx::get_mx_records_for_email(&mut internal_status);
 
-        // Update storage with this MX information
-        let status = self.update_storage(&email, &internal_status);
-        if status != WorkerStatus::Ok {
-            return status;
+            // Update storage with this MX information
+            let status = self.update_storage(&email, &internal_status);
+            if status != WorkerStatus::Ok {
+                return status;
+            }
         }
 
         // Attempt delivery of the email
@@ -230,7 +232,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
                         Ok(x) => x
                     }
                 };
-                return self.send_email(email, internal_status);
+                return self.send_email(email, internal_status, false);
             },
         }
     }
