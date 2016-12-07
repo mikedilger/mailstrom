@@ -173,6 +173,21 @@ impl<S: MailstromStorage + 'static> Worker<S>
             }
         }
 
+        // Fail all recipients after too many worker attempts
+        if internal_status.attempts_remaining == 0 {
+            for recipient in internal_status.recipients.iter_mut() {
+                let mut data: Option<(u8, String)> = None;
+                if let DeliveryResult::Deferred(attempts, ref msg) = recipient.result {
+                    data = Some((attempts, msg.clone()));
+                }
+                if data.is_some() {
+                    let (attempts,msg) = data.unwrap();
+                    recipient.result = DeliveryResult::Failed(
+                        format!("Too many attempts ({}): {}", attempts, msg));
+                }
+            }
+        }
+
         // Attempt delivery of the email
         let deferred_attempts = deliver(&email, &mut internal_status, &*self.helo_name);
 
