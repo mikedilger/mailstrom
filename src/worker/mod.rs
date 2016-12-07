@@ -156,7 +156,20 @@ impl<S: MailstromStorage + 'static> Worker<S>
     fn send_email(&mut self, email: Email, mut internal_status: InternalStatus)
                   -> WorkerStatus
     {
+        // Initial storage of the email
+        let status = self.update_storage(&email, &internal_status);
+        if status != WorkerStatus::Ok {
+            return status;
+        }
+
+        // Get MX records for each recipient
         ::worker::mx::get_mx_records_for_email(&mut internal_status);
+
+        // Update storage with this MX information
+        let status = self.update_storage(&email, &internal_status);
+        if status != WorkerStatus::Ok {
+            return status;
+        }
 
         let mut some_deferred_with_attempts: Option<u8> = None;
 
@@ -230,6 +243,27 @@ impl<S: MailstromStorage + 'static> Worker<S>
             }
         }
 
+        // Update storage with the new delivery results
+        let status = self.update_storage(&email, &internal_status);
+        if status != WorkerStatus::Ok {
+            return status;
+        }
+
+        if let Some(attempts) = some_deferred_with_attempts {
+            // Create a new worker task to retry later
+            self.tasks.insert( Task {
+                tasktype: TaskType::Resend,
+                time: Instant::now() + Duration::from_secs(60 * 3u64.pow(attempts as u32)),
+                message_id: internal_status.message_id.clone(),
+            });
+        }
+
+        WorkerStatus::Ok
+    }
+
+    fn update_storage(&mut self, email: &Email, internal_status: &InternalStatus)
+       -> WorkerStatus
+    {
         // Lock the storage
         let mut guard = match (*self.storage).write() {
             Ok(guard) => guard,
@@ -243,15 +277,6 @@ impl<S: MailstromStorage + 'static> Worker<S>
         if let Err(e) = (*guard).store(&email, &internal_status) {
             error!("{:?}", e);
             return WorkerStatus::StorageWriteFailed;
-        }
-
-        if let Some(attempts) = some_deferred_with_attempts {
-            // Create a new worker task to retry later
-            self.tasks.insert( Task {
-                tasktype: TaskType::Resend,
-                time: Instant::now() + Duration::from_secs(60 * 3u64.pow(attempts as u32)),
-                message_id: internal_status.message_id.clone(),
-            });
         }
 
         WorkerStatus::Ok
