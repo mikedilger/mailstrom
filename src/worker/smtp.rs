@@ -5,12 +5,13 @@ use lettre::transport::smtp::error::Error as LettreSmtpError;
 use lettre::transport::EmailTransport;
 use status::DeliveryResult;
 use email_format::Email;
-use email_format::rfc5322::types::{Mailbox, Address, GroupList};
+use email_format::rfc5322::types::Mailbox;
 
 // Implement lettre's SendableEmail
 
 pub struct Envelope<'a> {
     pub message_id: String,
+    pub to_addresses: Vec<String>,
     pub email: &'a Email,
 }
 
@@ -33,42 +34,7 @@ impl<'a> ::lettre::email::SendableEmail for Envelope<'a> {
         }
     }
     fn to_addresses(&self) -> Vec<String> {
-        let mut output: Vec<String> = Vec::new();
-
-        if let Some(to) = self.email.get_to() {
-            for addr in (to.0).0.iter() {
-                match addr {
-                    &Address::Mailbox(ref mb) => {
-                        match mb {
-                            &Mailbox::NameAddr(ref na) =>
-                                output.push(format!("{}", na.angle_addr.addr_spec)
-                                            .trim().to_owned()),
-                            &Mailbox::AddrSpec(ref aspec) =>
-                                output.push(format!("{}", aspec)
-                                            .trim().to_owned()),
-                        }
-                    },
-                    &Address::Group(ref grp) => {
-                        match grp.group_list {
-                            Some(GroupList::MailboxList(ref mbl)) => {
-                                for mb in mbl.0.iter() {
-                                    match mb {
-                                        &Mailbox::NameAddr(ref na) =>
-                                            output.push(format!("{}", na.angle_addr.addr_spec)
-                                                        .trim().to_owned()),
-                                        &Mailbox::AddrSpec(ref aspec) =>
-                                            output.push(format!("{}", aspec)
-                                                        .trim().to_owned()),
-                                    }
-                                }
-                            },
-                            _ => {},
-                        }
-                    },
-                }
-            }
-        }
-        output
+        self.to_addresses.clone()
     }
     fn message(&self) -> String {
         format!("{}", self.email)

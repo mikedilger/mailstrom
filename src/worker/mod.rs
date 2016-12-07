@@ -241,6 +241,10 @@ fn deliver(email: &Email, internal_status: &mut InternalStatus, helo_name: &str)
 {
     let mut some_deferred_with_attempts: Option<u8> = None;
 
+    let to_addresses: Vec<String> = internal_status.recipients.iter()
+        .map(|r| r.email_addr.clone())
+        .collect();
+
     'next_recipient:
     for recipient in &mut internal_status.recipients {
 
@@ -291,12 +295,13 @@ fn deliver(email: &Email, internal_status: &mut InternalStatus, helo_name: &str)
             // CURRENT RECIPIENT: SEE BUG #3
              */
 
-            // Attempt delivery to this MX server
             let envelope = Envelope {
                 message_id: internal_status.message_id.clone(),
+                to_addresses: to_addresses.clone(),
                 email: email
             };
 
+            // Attempt delivery to this MX server
             recipient.result = ::worker::smtp::smtp_delivery(
                 envelope, &mx_servers[i], helo_name, attempt);
 
