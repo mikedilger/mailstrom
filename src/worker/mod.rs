@@ -15,6 +15,7 @@ use internal_status::InternalStatus;
 use status::DeliveryResult;
 use storage::MailstromStorage;
 use self::task::{Task, TaskType};
+use self::smtp::Envelope;
 
 pub enum Message {
     /// Ask the worker to deliver an email
@@ -210,9 +211,13 @@ impl<S: MailstromStorage + 'static> Worker<S>
                  */
 
                 // Attempt delivery to this MX server
+                let envelope = Envelope {
+                    message_id: internal_status.message_id.clone(),
+                    email: &email
+                };
+
                 recipient.result = ::worker::smtp::smtp_delivery(
-                    &email, internal_status.message_id.clone(),
-                    &mx_servers[i], &*self.helo_name, attempt);
+                    envelope, &mx_servers[i], &*self.helo_name, attempt);
 
                 match recipient.result {
                     DeliveryResult::Deferred(_,_) => { } // continue MX loop

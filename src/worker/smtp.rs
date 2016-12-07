@@ -79,9 +79,9 @@ impl<'a> ::lettre::email::SendableEmail for Envelope<'a> {
 }
 
 // Deliver an email to an SMTP server
-pub fn smtp_delivery(email: &Email, message_id: String, smtp_server: &SocketAddr,
-                     helo: &str, attempt: u8)
-                     -> DeliveryResult
+pub fn smtp_delivery<'a>(envelope: Envelope<'a>,
+                         smtp_server: &SocketAddr, helo: &str, attempt: u8)
+                         -> DeliveryResult
 {
     let mailer = match SmtpTransportBuilder::new( smtp_server ) {
         Ok(m) => m,
@@ -96,11 +96,6 @@ pub fn smtp_delivery(email: &Email, message_id: String, smtp_server: &SocketAddr
         .security_level(SecurityLevel::Opportunistic) // STARTTLS if available
         .smtp_utf8(true) // is only used if the server supports it
         .build();
-
-    let envelope = Envelope {
-        message_id: message_id,
-        email: email,
-    };;
 
     let result = match mailer.send(envelope) {
         Ok(response) => {
