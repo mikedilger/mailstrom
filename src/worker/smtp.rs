@@ -9,12 +9,12 @@ use email_format::rfc5322::types::{Mailbox, Address, GroupList};
 
 // Implement lettre's SendableEmail
 
-struct SEmail<'a> {
-    email: &'a Email,
-    message_id: String,
+pub struct Envelope<'a> {
+    pub message_id: String,
+    pub email: &'a Email,
 }
 
-impl<'a> ::lettre::email::SendableEmail for SEmail<'a> {
+impl<'a> ::lettre::email::SendableEmail for Envelope<'a> {
     fn from_address(&self) -> String {
         match self.email.get_sender() {
             // Use sender if available
@@ -97,12 +97,12 @@ pub fn smtp_delivery(email: &Email, message_id: String, smtp_server: &SocketAddr
         .smtp_utf8(true) // is only used if the server supports it
         .build();
 
-    let semail = SEmail {
-        email: email,
+    let envelope = Envelope {
         message_id: message_id,
+        email: email,
     };;
 
-    let result = match mailer.send(semail) {
+    let result = match mailer.send(envelope) {
         Ok(response) => {
             info!("(worker) delivery response: {:?}", response);
             match response.severity() {
