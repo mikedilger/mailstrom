@@ -38,6 +38,14 @@ pub struct InternalStatus {
     /// is None, then the recipient information has not been determined yet
     /// (MX record lookups take some time).
     pub recipients: Vec<Recipient>,
+
+    /// Attempts remaining. This counts backwards to zero. If all deliveries are
+    /// complete (permanent success or failure), it is set to zero.
+    ///
+    /// Per-recipient deferred attempt numbers count upwards, and may get more
+    /// attempts because a single worker pass may try a recipient on muliple MX
+    /// servers.
+    pub attempts_remaining: u8,
 }
 
 impl InternalStatus
@@ -67,6 +75,7 @@ impl InternalStatus
         Ok((InternalStatus {
             message_id: message_id,
             recipients: recipients,
+            attempts_remaining: 3,
         }, email))
     }
 
