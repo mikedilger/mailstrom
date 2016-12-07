@@ -78,12 +78,12 @@ impl<'a> ::lettre::email::SendableEmail for SEmail<'a> {
     }
 }
 
-// Deliver an email to an MX server
-pub fn mx_delivery(email: &Email, message_id: String, mx_server: &SocketAddr,
-                   helo: &str, attempt: u8)
-                   -> DeliveryResult
+// Deliver an email to an SMTP server
+pub fn smtp_delivery(email: &Email, message_id: String, smtp_server: &SocketAddr,
+                     helo: &str, attempt: u8)
+                     -> DeliveryResult
 {
-    let mailer = match SmtpTransportBuilder::new( mx_server ) {
+    let mailer = match SmtpTransportBuilder::new( smtp_server ) {
         Ok(m) => m,
         Err(e) => {
             return DeliveryResult::Failed(

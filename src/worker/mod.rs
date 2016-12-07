@@ -1,5 +1,5 @@
 
-mod delivery;
+mod smtp;
 mod task;
 mod mx;
 
@@ -210,7 +210,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
                  */
 
                 // Attempt delivery to this MX server
-                recipient.result = ::worker::delivery::mx_delivery(
+                recipient.result = ::worker::smtp::smtp_delivery(
                     &email, internal_status.message_id.clone(),
                     &mx_servers[i], &*self.helo_name, attempt);
 
