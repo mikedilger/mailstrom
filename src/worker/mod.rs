@@ -171,77 +171,8 @@ impl<S: MailstromStorage + 'static> Worker<S>
             return status;
         }
 
-        let mut some_deferred_with_attempts: Option<u8> = None;
-
-        'next_recipient:
-        for recipient in &mut internal_status.recipients {
-
-            // Skip if already completed
-            match recipient.result {
-                DeliveryResult::Delivered(_) => continue,
-                DeliveryResult::Failed(_) => continue,
-                _ => {}
-            }
-
-            let mut attempt: u8 = 0;
-            let deferred_data: Option<(u8, String)> =
-                if let DeliveryResult::Deferred(a, ref msg) = recipient.result {
-                    Some((a, msg.clone()))
-                } else {
-                    None
-                };
-            if deferred_data.is_some() {
-                let (a,msg) = deferred_data.unwrap();
-                // Try again
-                attempt = a + 1;
-                if a == 3 {
-                    // Or fail if too many attempts
-                    debug!("(worker) delivery failed after 3 attempts.");
-                    recipient.result = DeliveryResult::Failed(
-                        format!("Failed after 3 attempts: {}", msg));
-                    continue;
-                }
-            }
-
-            // Skip (and complete) if no MX servers
-            if recipient.mx_servers.is_none() {
-                debug!("(worker) delivery failed (no valid MX records).");
-                recipient.result = DeliveryResult::Failed(
-                    "MX records found but none are valid".to_owned());
-                continue;
-            }
-
-            // Sequence through MX servers
-            let mx_servers: &Vec<SocketAddr> = recipient.mx_servers.as_ref().unwrap();
-
-            for i in recipient.current_mx .. mx_servers.len() {
-
-                /*
-                // Mark completed if this MX server is known to have been successfully
-                // delivered to already
-                // THIS DOES NOT WORK DUE TO THE RECIPIENTS PREVIOUSLY NOT INCLUDING THIS
-                // CURRENT RECIPIENT: SEE BUG #3
-                 */
-
-                // Attempt delivery to this MX server
-                let envelope = Envelope {
-                    message_id: internal_status.message_id.clone(),
-                    email: &email
-                };
-
-                recipient.result = ::worker::smtp::smtp_delivery(
-                    envelope, &mx_servers[i], &*self.helo_name, attempt);
-
-                match recipient.result {
-                    DeliveryResult::Deferred(_,_) => { } // continue MX loop
-                    _ => break, // Exit mx loop
-                }
-            }
-
-            if let DeliveryResult::Deferred(a, _) = recipient.result {
-                some_deferred_with_attempts = Some(a);
-            }
-        }
+        // Attempt delivery of the email
+        let deferred_attempts = deliver(&email, &mut internal_status, &*self.helo_name);
 
         // Update storage with the new delivery results
         let status = self.update_storage(&email, &internal_status);
@@ -249,7 +180,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
             return status;
         }
 
-        if let Some(attempts) = some_deferred_with_attempts {
+        if let Some(attempts) = deferred_attempts {
             // Create a new worker task to retry later
             self.tasks.insert( Task {
                 tasktype: TaskType::Resend,
@@ -303,4 +234,82 @@ impl<S: MailstromStorage + 'static> Worker<S>
             },
         }
     }
+}
+
+fn deliver(email: &Email, internal_status: &mut InternalStatus, helo_name: &str)
+    -> Option<u8>
+{
+    let mut some_deferred_with_attempts: Option<u8> = None;
+
+    'next_recipient:
+    for recipient in &mut internal_status.recipients {
+
+        // Skip if already completed
+        match recipient.result {
+            DeliveryResult::Delivered(_) => continue,
+            DeliveryResult::Failed(_) => continue,
+            _ => {}
+        }
+
+        let mut attempt: u8 = 0;
+        let deferred_data: Option<(u8, String)> =
+            if let DeliveryResult::Deferred(a, ref msg) = recipient.result {
+                Some((a, msg.clone()))
+            } else {
+                None
+            };
+        if deferred_data.is_some() {
+            let (a,msg) = deferred_data.unwrap();
+            // Try again
+            attempt = a + 1;
+            if a == 3 {
+                // Or fail if too many attempts
+                debug!("(worker) delivery failed after 3 attempts.");
+                recipient.result = DeliveryResult::Failed(
+                    format!("Failed after 3 attempts: {}", msg));
+                continue;
+            }
+        }
+
+        // Skip (and complete) if no MX servers
+        if recipient.mx_servers.is_none() {
+            debug!("(worker) delivery failed (no valid MX records).");
+            recipient.result = DeliveryResult::Failed(
+                "MX records found but none are valid".to_owned());
+            continue;
+        }
+
+        // Sequence through MX servers
+        let mx_servers: &Vec<SocketAddr> = recipient.mx_servers.as_ref().unwrap();
+
+        for i in recipient.current_mx .. mx_servers.len() {
+
+            /*
+            // Mark completed if this MX server is known to have been successfully
+            // delivered to already
+            // THIS DOES NOT WORK DUE TO THE RECIPIENTS PREVIOUSLY NOT INCLUDING THIS
+            // CURRENT RECIPIENT: SEE BUG #3
+             */
+
+            // Attempt delivery to this MX server
+            let envelope = Envelope {
+                message_id: internal_status.message_id.clone(),
+                email: email
+            };
+
+            recipient.result = ::worker::smtp::smtp_delivery(
+                envelope, &mx_servers[i], helo_name, attempt);
+
+            match recipient.result {
+                DeliveryResult::Deferred(_,_) => { } // continue MX loop
+                _ => break, // Exit mx loop
+            }
+        }
+
+        if let DeliveryResult::Deferred(a, _) = recipient.result {
+            some_deferred_with_attempts = Some(a);
+        }
+    }
+
+    some_deferred_with_attempts
 }
