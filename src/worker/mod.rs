@@ -81,12 +81,24 @@ impl<S: MailstromStorage + 'static> Worker<S>
 
     pub fn run(&mut self) {
 
-        // This timeout represents how long we wait for a message.  If there are any
-        // tasks in the tasklist, this will be the tiem until the first task is
-        // due.  Otherwise it is set to 60 seconds.
-        let mut timeout: Duration = Duration::from_secs(60);
-
         loop {
+            // Compute the timeout
+            // This timeout represents how long we wait for a message.  If there are any
+            // tasks in the tasklist, this will be the tiem until the first task is
+            // due.  Otherwise it is set to 60 seconds.
+            let now = Instant::now();
+            let timeout: Duration = if let Some(task) = self.tasks.iter().next() {
+                debug!("(worker) loop start (tasks in queue)");
+                if task.time > now {
+                    task.time - now
+                } else {
+                    Duration::new(0,0) // overdue!
+                }
+            } else {
+                debug!("(worker) loop start (no tasks)");
+                Duration::from_secs(60)
+            };
+
             debug!("(worker) waiting for a message ({} seconds)", timeout.as_secs());
 
             // Receive a message.  Waiting at most until the time when the next task
@@ -136,20 +148,6 @@ impl<S: MailstromStorage + 'static> Worker<S>
                 }
                 self.tasks.remove(task);
             }
-
-            // Recompute the timeout
-            let now = Instant::now();
-            timeout = if let Some(task) = self.tasks.iter().next() {
-                debug!("(worker) looping (tasks in queue)");
-                if task.time > now {
-                    task.time - now
-                } else {
-                    Duration::new(0,0) // overdue!
-                }
-            } else {
-                debug!("(worker) looping (no tasks)");
-                Duration::from_secs(60)
-            };
         }
     }
 
