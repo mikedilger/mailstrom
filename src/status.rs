@@ -17,6 +17,16 @@ pub enum DeliveryResult {
     Failed(String),
 }
 
+impl DeliveryResult {
+    pub fn completed(&self) -> bool {
+        match *self {
+            DeliveryResult::Queued => false,
+            DeliveryResult::Deferred(_,_) => false,
+            _ => true
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RecipientStatus {
     pub recipient: String,
@@ -43,11 +53,7 @@ impl Status {
     pub fn completed(&self) -> bool
     {
         self.recipient_status.iter().all(|ref r| {
-            match r.result {
-                DeliveryResult::Queued => false,
-                DeliveryResult::Deferred(_,_) => false,
-                _ => true,
-            }
+            r.result.completed()
         })
     }
 }
