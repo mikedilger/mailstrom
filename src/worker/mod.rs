@@ -189,11 +189,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
         }
 
         // Attempt delivery of the email
-        let deferred_attempts = deliver(&email, &mut internal_status, &*self.helo_name);
-
-        // Update attempts remaining
-        if deferred_attempts.is_none() {
-            // all recipients have been completed
+        if deliver(&email, &mut internal_status, &*self.helo_name) {
             internal_status.attempts_remaining = 0;
         } else {
             internal_status.attempts_remaining = internal_status.attempts_remaining - 1;
@@ -205,11 +201,16 @@ impl<S: MailstromStorage + 'static> Worker<S>
             return status;
         }
 
-        if let Some(attempts) = deferred_attempts {
+        if internal_status.attempts_remaining > 0 {
+            let attempt = 3 - internal_status.attempts_remaining;
+            let delay = Duration::from_secs(60 * 3u64.pow(attempt as u32));
+            trace!("Queueing task to retry {} in {} seconds",
+                   &internal_status.message_id, delay.as_secs());
+
             // Create a new worker task to retry later
             self.tasks.insert( Task {
                 tasktype: TaskType::Resend,
-                time: Instant::now() + Duration::from_secs(60 * 3u64.pow(attempts as u32)),
+                time: Instant::now() + delay,
                 message_id: internal_status.message_id.clone(),
             });
         }
@@ -261,8 +262,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
     }
 }
 
-fn deliver(email: &Email, internal_status: &mut InternalStatus, helo_name: &str)
-    -> Option<u8>
+fn deliver(email: &Email, internal_status: &mut InternalStatus, helo_name: &str) -> bool
 {
     let mut some_deferred_with_attempts: Option<u8> = None;
 
@@ -341,5 +341,5 @@ fn deliver(email: &Email, internal_status: &mut InternalStatus, helo_name: &str)
         }
     }
 
-    some_deferred_with_attempts
+    some_deferred_with_attempts.is_some()
 }
