@@ -145,8 +145,8 @@ fn recipient_from_mailbox(mb: Mailbox) -> Recipient
     };
 
     Recipient {
-        email_addr: email_addr,
-        domain: domain,
+        email_addr: email_addr.trim().to_owned(),
+        domain: domain.trim().to_owned(),
         mx_servers: None, // To be determined later by a worker task
         current_mx: 0,
         result: DeliveryResult::Queued,
