@@ -366,7 +366,13 @@ fn deliver(email: &Email, internal_status: &mut InternalStatus, helo_name: &str)
         let envelope = Envelope {
             message_id: internal_status.message_id.clone(),
             to_addresses: mxd.recipients.iter()
-                .map(|r| internal_status.recipients[*r].email_addr.clone())
+                .filter_map(|r| {
+                    if internal_status.recipients[*r].result.completed() {
+                        None
+                    } else {
+                        Some(internal_status.recipients[*r].email_addr.clone())
+                    }
+                })
                 .collect(),
             email: &email
         };
