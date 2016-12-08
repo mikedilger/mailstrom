@@ -191,6 +191,14 @@ impl<S: MailstromStorage + 'static> Worker<S>
         // Attempt delivery of the email
         let deferred_attempts = deliver(&email, &mut internal_status, &*self.helo_name);
 
+        // Update attempts remaining
+        if deferred_attempts.is_none() {
+            // all recipients have been completed
+            internal_status.attempts_remaining = 0;
+        } else {
+            internal_status.attempts_remaining = internal_status.attempts_remaining - 1;
+        }
+
         // Update storage with the new delivery results
         let status = self.update_storage(&email, &internal_status);
         if status != WorkerStatus::Ok {
