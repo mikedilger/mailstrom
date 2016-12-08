@@ -84,4 +84,17 @@ impl MailstromStorage for MemoryStorage {
         };
         Ok(status.clone())
     }
+
+    fn retrieve_all_incomplete(&self) -> Result<Vec<InternalStatus>, Self::Error>
+    {
+        Ok(self.statuses.values()
+           .filter_map(|is| {
+               if is.attempts_remaining == 0 {
+                   None
+               } else {
+                   Some(is.clone())
+               }
+           })
+           .collect())
+    }
 }

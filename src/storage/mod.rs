@@ -24,4 +24,8 @@ pub trait MailstromStorage: Send + Sync {
 
     /// Retrieve an `InternalStatus` based on the message_id
     fn retrieve_status(&self, message_id: &str) -> Result<InternalStatus, Self::Error>;
+
+    /// Retrieve all incomplete emails (status only). This is used to continue retrying
+    /// after shutdown and later startup.
+    fn retrieve_all_incomplete(&self) -> Result<Vec<InternalStatus>, Self::Error>;
 }
