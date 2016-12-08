@@ -49,7 +49,9 @@ pub fn smtp_delivery<'a>(envelope: Envelope<'a>,
                          smtp_server: &SocketAddr, helo: &str, attempt: u8)
                          -> DeliveryResult
 {
-    trace!("Entered SMTP delivery to {}", smtp_server);
+    trace!("SMTP delivery to [{}] at {}",
+           envelope.to_addresses.join(","),
+           smtp_server);
 
     let mailer = match SmtpTransportBuilder::new( smtp_server ) {
         Ok(m) => m,
