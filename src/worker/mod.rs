@@ -32,6 +32,7 @@ pub enum WorkerStatus {
     ChannelDisconnected = 2,
     LockPoisoned = 3,
     StorageWriteFailed = 4,
+    StorageReadFailed = 5,
     Unknown = 255,
 }
 impl WorkerStatus {
@@ -70,13 +71,37 @@ impl<S: MailstromStorage + 'static> Worker<S>
                helo_name: &str)
                -> Worker<S>
     {
-        Worker {
+        let mut worker = Worker {
             receiver: receiver,
             worker_status: worker_status,
             helo_name: helo_name.to_owned(),
             storage: storage,
             tasks: BTreeSet::new(),
+        };
+
+        // Load the incomplete (deferred) email statuses, for tasking
+        if let Ok(guard) = (*worker.storage).write() {
+            if let Ok(mut isvec) = (*guard).retrieve_all_incomplete() {
+                // Create one task for each deferred email, spaced out by 20 seconds each
+                let mut delay = Duration::from_secs(20);
+                for is in isvec.drain(..) {
+                    worker.tasks.insert( Task {
+                        tasktype: TaskType::Resend,
+                        time: Instant::now() + delay,
+                        message_id: is.message_id.clone(),
+                    });
+                    delay = delay + Duration::from_secs(20); // space them by 20 seconds
+                }
+            } else {
+                worker.worker_status.store(WorkerStatus::StorageReadFailed as u8,
+                                           Ordering::SeqCst);
+            }
+        } else {
+            worker.worker_status.store(WorkerStatus::LockPoisoned as u8,
+                                       Ordering::SeqCst);
         }
+
+        worker
     }
 
     pub fn run(&mut self) {
