@@ -377,6 +377,13 @@ fn deliver(email: &Email, internal_status: &mut InternalStatus, helo_name: &str)
             email: &email
         };
 
+        // Skip this MX server if no addresses to deliver to
+        // (this can happen if a previous server already handled its recipients and
+        // the filter_map above removed them all)
+        if envelope.to_addresses.len() == 0 {
+            continue;
+        }
+
         // Actually deliver to this SMTP server
         // (we set attempt=1 but this gets replaced per recipient below)
         let result = ::worker::smtp::smtp_delivery(
