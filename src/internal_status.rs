@@ -10,8 +10,11 @@ use status::{Status, RecipientStatus, DeliveryResult};
 /// Information about the recipients of an email to be sent
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Recipient {
-    /// The recipient's email address
+    /// The recipient's email address (for display)
     pub email_addr: String,
+
+    /// The recipient's email address (for SMTP)
+    pub smtp_email_addr: String,
 
     /// The domain parsed off of the recipients email address
     pub domain: String,
@@ -140,15 +143,18 @@ fn address_list_recipients(address_list: AddressList) -> Vec<Recipient>
 
 fn recipient_from_mailbox(mb: Mailbox) -> Recipient
 {
-    let (email_addr, domain) = match mb {
+    let (email_addr, smtp_email_addr, domain) = match mb {
         Mailbox::NameAddr(na) => (format!("{}", na),
+                                  format!("{}", na.angle_addr.addr_spec),
                                   format!("{}", na.angle_addr.addr_spec.domain)),
         Mailbox::AddrSpec(ads) => (format!("{}", ads),
+                                   format!("{}", ads),
                                    format!("{}", ads.domain)),
     };
 
     Recipient {
         email_addr: email_addr.trim().to_owned(),
+        smtp_email_addr: smtp_email_addr.trim().to_owned(),
         domain: domain.trim().to_owned(),
         mx_servers: None, // To be determined later by a worker task
         current_mx: 0,

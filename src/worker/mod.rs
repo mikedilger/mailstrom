@@ -370,7 +370,7 @@ fn deliver(email: &Email, internal_status: &mut InternalStatus, helo_name: &str)
                     if internal_status.recipients[*r].result.completed() {
                         None
                     } else {
-                        Some(internal_status.recipients[*r].email_addr.clone())
+                        Some(internal_status.recipients[*r].smtp_email_addr.clone())
                     }
                 })
                 .collect(),
