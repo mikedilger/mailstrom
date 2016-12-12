@@ -16,7 +16,7 @@ env_logger = "0.3"
 uuid = { version = "0.3", features = [ "v4" ] }
 email-format = "0.3"
 resolv = ">=0.1.3"
-lettre = "0.6"
+lettre = { git = "https://github.com/lettre/lettre", rev = "90b00ae4ffc8828041160dc4cb579d53f4173c8e" }
 log = "0.3"
 serde = "0.8"
 serde_derive = "0.8"

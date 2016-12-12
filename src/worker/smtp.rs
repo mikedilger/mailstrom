@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::time::Duration;
 use lettre::transport::smtp::{SmtpTransportBuilder, SecurityLevel};
 use lettre::transport::smtp::response::Severity;
 use lettre::transport::smtp::error::Error as LettreSmtpError;
@@ -36,7 +37,7 @@ impl<'a> ::lettre::email::SendableEmail for Envelope<'a> {
     fn to_addresses(&self) -> Vec<String> {
         self.to_addresses.clone()
     }
-    fn message(&self) -> String {
+    fn message(self) -> String {
         format!("{}", self.email)
     }
     fn message_id(&self) -> String {
@@ -65,6 +66,7 @@ pub fn smtp_delivery<'a>(envelope: Envelope<'a>,
     let mut mailer = mailer.hello_name( helo )
         .security_level(SecurityLevel::Opportunistic) // STARTTLS if available
         .smtp_utf8(true) // is only used if the server supports it
+        .timeout(Some(Duration::from_secs(15)))
         .build();
 
     let result = match mailer.send(envelope) {
