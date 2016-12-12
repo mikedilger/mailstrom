@@ -7,6 +7,7 @@ use lettre::transport::EmailTransport;
 use status::DeliveryResult;
 use email_format::Email;
 use email_format::rfc5322::types::Mailbox;
+use ::Config;
 
 // Implement lettre's SendableEmail
 
@@ -47,7 +48,7 @@ impl<'a> ::lettre::email::SendableEmail for Envelope<'a> {
 
 // Deliver an email to an SMTP server
 pub fn smtp_delivery<'a>(envelope: Envelope<'a>,
-                         smtp_server: &SocketAddr, helo: &str, attempt: u8)
+                         smtp_server: &SocketAddr, config: &Config, attempt: u8)
                          -> DeliveryResult
 {
     trace!("SMTP delivery to [{}] at {}",
@@ -63,10 +64,10 @@ pub fn smtp_delivery<'a>(envelope: Envelope<'a>,
     };
 
     // Configure the mailer
-    let mut mailer = mailer.hello_name( helo )
+    let mut mailer = mailer.hello_name( &*config.helo_name )
         .security_level(SecurityLevel::Opportunistic) // STARTTLS if available
         .smtp_utf8(true) // is only used if the server supports it
-        .timeout(Some(Duration::from_secs(15)))
+        .timeout(Some(Duration::from_secs( config.smtp_timeout_secs )))
         .build();
 
     let result = match mailer.send(envelope) {

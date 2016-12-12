@@ -16,6 +16,7 @@ use status::DeliveryResult;
 use storage::MailstromStorage;
 use self::task::{Task, TaskType};
 use self::smtp::Envelope;
+use ::Config;
 
 pub enum Message {
     /// Ask the worker to deliver an email
@@ -54,7 +55,7 @@ pub struct Worker<S: MailstromStorage + 'static>
 
     worker_status: Arc<AtomicU8>,
 
-    helo_name: String,
+    config: Config,
 
     // Persistent shared storage
     storage: Arc<RwLock<S>>,
@@ -68,13 +69,13 @@ impl<S: MailstromStorage + 'static> Worker<S>
     pub fn new(receiver: mpsc::Receiver<Message>,
                storage: Arc<RwLock<S>>,
                worker_status: Arc<AtomicU8>,
-               helo_name: &str)
+               config: Config)
                -> Worker<S>
     {
         let mut worker = Worker {
             receiver: receiver,
             worker_status: worker_status,
-            helo_name: helo_name.to_owned(),
+            config: config,
             storage: storage,
             tasks: BTreeSet::new(),
         };
@@ -212,7 +213,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
         }
 
         // Attempt delivery of the email
-        if deliver(&email, &mut internal_status, &*self.helo_name) {
+        if deliver(&email, &mut internal_status, &self.config) {
             internal_status.attempts_remaining = 0;
         } else {
             internal_status.attempts_remaining = internal_status.attempts_remaining - 1;
@@ -292,7 +293,7 @@ struct MxDelivery {
 
 // Organize delivery for one-SMTP-delivery per MX server, and then use smtp_deliver()
 // Returns true only if all recipient deliveries have been completed (rather than deferred)
-fn deliver(email: &Email, internal_status: &mut InternalStatus, helo_name: &str) -> bool
+fn deliver(email: &Email, internal_status: &mut InternalStatus, config: &Config) -> bool
 {
     let mut deferred_some: bool = false;
 
@@ -387,7 +388,7 @@ fn deliver(email: &Email, internal_status: &mut InternalStatus, helo_name: &str)
         // Actually deliver to this SMTP server
         // (we set attempt=1 but this gets replaced per recipient below)
         let result = ::worker::smtp::smtp_delivery(
-            envelope, &mxd.mx_server, helo_name, 1);
+            envelope, &mxd.mx_server, config, 1);
 
         for r in mxd.recipients.iter() {
 

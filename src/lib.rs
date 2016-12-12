@@ -110,10 +110,11 @@ use error::Error;
 use internal_status::InternalStatus;
 pub use storage::{MailstromStorage, MailstromStorageError, MemoryStorage};
 
-
+#[derive(Debug, Clone)]
 pub struct Config
 {
-    pub helo_name: String
+    pub helo_name: String,
+    pub smtp_timeout_secs: u64,
 }
 
 pub struct Mailstrom<S: MailstromStorage + 'static>
@@ -135,7 +136,8 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
 
         let worker_status = Arc::new(AtomicU8::new(WorkerStatus::Ok as u8));
 
-        let mut worker = Worker::new(receiver, storage.clone(), worker_status.clone(), &*config.helo_name);
+        let mut worker = Worker::new(receiver, storage.clone(), worker_status.clone(),
+                                     config.clone());
 
         let _ = thread::spawn(move|| {
             worker.run();
