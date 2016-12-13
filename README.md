@@ -36,6 +36,8 @@ background worker thread.  It does the following:
    It defines types one-to-one with ABNF parsing units, rather than as semantic units of meaning.
    And it doesn't let you use obvious types yet like setting the date from a DateTime type.
    However, these issues will be worked out in the near future.
+ * This crate is not highly performant. If we wanted high throughput, we should use multiple
+   threads and base off of the tokio crate. Maybe in a future version.
 
 ## License
 
@@ -51,3 +53,29 @@ at your option.
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall
 be dual licensed as above, without any additional terms or conditions.
+
+# How to avoid having your emails tagged as Spam
+
+Mailstrom does its part to help get your emails delivered, by being compliant with RFC5322
+and including a `Message-Id` header in every email.
+
+You are responsible for the lion's share of the work in this regard.  This link at
+[Gmail support](https://support.google.com/mail/answer/81126?hl=en&vid=0-289374121815-1481666526430)
+is quite helpful. Also,
+
+ * Use a consistent IP address for sending.
+ * If possible, have the reverse DNS of your IP address point to the domain name you are
+   sending emails from.  For gmail, this is absolutely required when sending over IPv6
+ * Use a consistent helo name when sending
+ * Use a consistent From email address
+ * Publish an SPF TXT record, or better yet, sign email messages with DKIM with a key of at
+   least 1024 bits
+ * Publish a DMARC policy
+ * Don't send spammy content. Don't send phishing content. Subject should be relevant to body.
+ * Allow your users to unsubscribe, either by replying or via a link.
+   Preferably provide a "List-Unsubscribe" email header pointing to the unsubscribe URL.
+ * Automatically unsubscribe users who's address bounces mulitple pieces of mail.
+ * If bulk, must have a "Precedence: bulk" header field
+ * Separate promotional emails from transactional emails via separate from addresses, or
+   even separate IP addresses and sending domains. If your promotional materials become
+   classified as spam, at least the transactional emails will still get delivered.
