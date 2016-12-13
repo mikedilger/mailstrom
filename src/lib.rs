@@ -203,6 +203,20 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
 
         Ok(status.as_status())
     }
+
+    // Query recently queued and sent emails. This includes all emails where sending is not
+    // yet complete, and also all emails where sending is complete but for which they have
+    // not yet been reported on (via this function).
+    pub fn query_recent(&mut self) -> Result<Vec<Status>, Error>
+    {
+        let mut guard = match (*self.storage).write() {
+            Ok(guard) => guard,
+            Err(_) => return Err(Error::Lock),
+        };
+
+        let vec_statuses = try!((*guard).retrieve_all_recent());
+        Ok(vec_statuses.iter().map(|s| s.as_status()).collect())
+    }
 }
 
 impl<S: MailstromStorage + 'static> Drop for Mailstrom<S>
