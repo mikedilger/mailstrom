@@ -178,11 +178,18 @@ impl<S: MailstromStorage + 'static> Worker<S>
         }
     }
 
-    fn send_email(&mut self, email: Email, mut internal_status: InternalStatus, initial: bool)
+    fn send_email(&mut self, email: Email, mut internal_status: InternalStatus)
                   -> WorkerStatus
     {
-        if initial {
-            // Get MX records for each recipient
+        let mut need_mx: bool = false;
+        for recipient in &internal_status.recipients {
+            if recipient.mx_servers.is_none() {
+                need_mx=true;
+                break;
+            }
+        }
+
+        if need_mx {
             ::worker::mx::get_mx_records_for_email(&mut internal_status);
 
             // Update storage with this MX information
@@ -274,7 +281,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
                         Ok(x) => x
                     }
                 };
-                return self.send_email(email, internal_status, false);
+                return self.send_email(email, internal_status);
             },
         }
     }
