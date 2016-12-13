@@ -19,6 +19,8 @@ use self::smtp::Envelope;
 use ::Config;
 
 pub enum Message {
+    /// Start sending emails
+    Start,
     /// Ask the worker to deliver an email (message_id is provided, Mailstrom will have
     /// already stored it)
     SendEmail(String),
@@ -62,7 +64,9 @@ pub struct Worker<S: MailstromStorage + 'static>
     storage: Arc<RwLock<S>>,
 
     // A list of tasks we need to do later, sorted in time order
-    tasks: BTreeSet<Task>
+    tasks: BTreeSet<Task>,
+
+    paused: bool
 }
 
 impl<S: MailstromStorage + 'static> Worker<S>
@@ -79,6 +83,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
             config: config,
             storage: storage,
             tasks: BTreeSet::new(),
+            paused: true,
         };
 
         // Load the incomplete (deferred) email statuses, for tasking
@@ -111,11 +116,15 @@ impl<S: MailstromStorage + 'static> Worker<S>
         loop {
             // Compute the timeout
             // This timeout represents how long we wait for a message.  If there are any
-            // tasks in the tasklist, this will be the time until the first task is
-            // due.  Otherwise it is set to 60 seconds.
-            let now = Instant::now();
-            let timeout: Duration = if let Some(task) = self.tasks.iter().next() {
+            // tasks in the tasklist (and we are not paused), this will be the time until
+            // the first task is due.  Otherwise it is set to 60 seconds.
+            let timeout: Duration = if self.paused {
+                debug!("(worker) loop start (paused)");
+                Duration::from_secs(60)
+            }
+            else if let Some(task) = self.tasks.iter().next() {
                 debug!("(worker) loop start (tasks in queue)");
+                let now = Instant::now();
                 if task.time > now {
                     task.time - now
                 } else {
@@ -132,6 +141,9 @@ impl<S: MailstromStorage + 'static> Worker<S>
             // is due, or 60 seconds if there are no tasks
             match self.receiver.recv_timeout(timeout) {
                 Ok(message) => match message {
+                    Message::Start => {
+                        self.paused = false;
+                    },
                     Message::SendEmail(message_id) => {
                         debug!("(worker) received SendEmail command");
                         // Create a task (don't do it right away) so we can more easily
@@ -159,21 +171,23 @@ impl<S: MailstromStorage + 'static> Worker<S>
                 }
             };
 
-            // Copy out all the tasks that are due
-            let now = Instant::now();
-            let due_tasks: Vec<Task> = self.tasks.iter()
-                .filter(|t| now > t.time).cloned().collect();
+            if ! self.paused {
+                // Copy out all the tasks that are due
+                let now = Instant::now();
+                let due_tasks: Vec<Task> = self.tasks.iter()
+                    .filter(|t| now > t.time).cloned().collect();
 
-            // Handle all these due tasks
-            for task in &due_tasks {
-                let worker_status = self.handle_task(task);
-                if worker_status != WorkerStatus::Ok {
-                    self.worker_status.store(worker_status as u8,
-                                             Ordering::SeqCst);
-                    debug!("(worker) failed and terminated");
-                    return;
+                // Handle all these due tasks
+                for task in &due_tasks {
+                    let worker_status = self.handle_task(task);
+                    if worker_status != WorkerStatus::Ok {
+                        self.worker_status.store(worker_status as u8,
+                                                 Ordering::SeqCst);
+                        debug!("(worker) failed and terminated");
+                        return;
+                    }
+                    self.tasks.remove(task);
                 }
-                self.tasks.remove(task);
             }
         }
     }

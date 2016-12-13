@@ -61,6 +61,11 @@
 //!         },
 //!         MemoryStorage::new());
 //!
+//!     // We must explicitly tell mailstrom to start actually sending emails.  If we
+//!     // were only interested in reading the status of previously sent emails, we
+//!     // would not send this command.
+//!     mailstrom.start().unwrap();
+//!
 //!     let message_id = mailstrom.send_email(email).unwrap();
 //!
 //!     // Later on, after the worker thread has had time to process the request,
@@ -150,6 +155,15 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
             worker_status: worker_status,
             storage: storage,
         }
+    }
+
+    /// Mailstrom requires an explicit start command to start sending emails.  This is
+    /// because some clients are only interested in reading the status of sent emails,
+    /// and will terminate before any real sending can be accomplished.
+    pub fn start(&mut self) -> Result<(), Error>
+    {
+        try!(self.sender.send(Message::Start));
+        Ok(())
     }
 
     /// Ask Mailstrom to die.  This is not required, you can simply let it fall out
