@@ -12,7 +12,7 @@ pub trait MailstromStorage: Send + Sync {
     type Error: MailstromStorageError;
 
     /// Store an `Email`.  This should overwrite if message-id matches an existing email.
-    fn store(&mut self, email: &Email, internal_status: &InternalStatus)
+    fn store(&mut self, email: Email, internal_status: InternalStatus)
              -> Result<(), Self::Error>;
 
     /// Update the status of an email

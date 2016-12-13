@@ -48,12 +48,12 @@ impl MemoryStorage {
 impl MailstromStorage for MemoryStorage {
     type Error = MemoryStorageError;
 
-    fn store(&mut self, email: &Email, internal_status: &InternalStatus)
+    fn store(&mut self, email: Email, internal_status: InternalStatus)
              -> Result<(), MemoryStorageError>
     {
         self.0.insert(internal_status.message_id.clone(), Record {
-            email: email.clone(),
-            status: internal_status.clone(),
+            email: email,
+            status: internal_status,
             retrieved: false
         });
         Ok(())

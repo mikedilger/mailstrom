@@ -250,7 +250,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
         };
 
         // Store the email delivery result (so far) into storage
-        if let Err(e) = (*guard).store(&email, &internal_status) {
+        if let Err(e) = (*guard).store(email.clone(), internal_status.clone()) {
             error!("{:?}", e);
             return WorkerStatus::StorageWriteFailed;
         }

@@ -182,7 +182,7 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
             };
 
             // Store the email
-            try!((*guard).store(&email, &internal_status));
+            try!((*guard).store(email, internal_status));
         }
 
         try!(self.sender.send(Message::SendEmail(message_id.clone())));
