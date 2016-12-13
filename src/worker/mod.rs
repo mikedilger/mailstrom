@@ -18,6 +18,8 @@ use self::task::{Task, TaskType};
 use self::smtp::Envelope;
 use ::Config;
 
+const LOOP_DELAY: u64 = 10;
+
 pub enum Message {
     /// Start sending emails
     Start,
@@ -89,15 +91,13 @@ impl<S: MailstromStorage + 'static> Worker<S>
         // Load the incomplete (deferred) email statuses, for tasking
         if let Ok(guard) = (*worker.storage).write() {
             if let Ok(mut isvec) = (*guard).retrieve_all_incomplete() {
-                // Create one task for each deferred email, spaced out by 20 seconds each
-                let mut delay = Duration::from_secs(20);
+                // Create one task for each deferred email
                 for is in isvec.drain(..) {
                     worker.tasks.insert( Task {
                         tasktype: TaskType::Resend,
-                        time: Instant::now() + delay,
+                        time: Instant::now(),
                         message_id: is.message_id.clone(),
                     });
-                    delay = delay + Duration::from_secs(20); // space them by 20 seconds
                 }
             } else {
                 worker.worker_status.store(WorkerStatus::StorageReadFailed as u8,
@@ -117,10 +117,10 @@ impl<S: MailstromStorage + 'static> Worker<S>
             // Compute the timeout
             // This timeout represents how long we wait for a message.  If there are any
             // tasks in the tasklist (and we are not paused), this will be the time until
-            // the first task is due.  Otherwise it is set to 60 seconds.
+            // the first task is due.  Otherwise it is set to LOOP_DELAY seconds.
             let timeout: Duration = if self.paused {
                 debug!("(worker) loop start (paused)");
-                Duration::from_secs(60)
+                Duration::from_secs(LOOP_DELAY)
             }
             else if let Some(task) = self.tasks.iter().next() {
                 debug!("(worker) loop start (tasks in queue)");
@@ -132,13 +132,13 @@ impl<S: MailstromStorage + 'static> Worker<S>
                 }
             } else {
                 debug!("(worker) loop start (no tasks)");
-                Duration::from_secs(60)
+                Duration::from_secs(LOOP_DELAY)
             };
 
             debug!("(worker) waiting for a message ({} seconds)", timeout.as_secs());
 
             // Receive a message.  Waiting at most until the time when the next task
-            // is due, or 60 seconds if there are no tasks
+            // is due, or LOOP_DELAY seconds if there are no tasks
             match self.receiver.recv_timeout(timeout) {
                 Ok(message) => match message {
                     Message::Start => {
