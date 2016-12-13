@@ -181,12 +181,6 @@ impl<S: MailstromStorage + 'static> Worker<S>
                   -> WorkerStatus
     {
         if initial {
-            // Initial storage of the email
-            let status = self.update_storage(&email, &internal_status);
-            if status != WorkerStatus::Ok {
-                return status;
-            }
-
             // Get MX records for each recipient
             ::worker::mx::get_mx_records_for_email(&mut internal_status);
 
