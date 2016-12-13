@@ -186,7 +186,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
             ::worker::mx::get_mx_records_for_email(&mut internal_status);
 
             // Update storage with this MX information
-            let status = self.update_storage(&email, &internal_status);
+            let status = self.update_status(&internal_status);
             if status != WorkerStatus::Ok {
                 return status;
             }
@@ -215,7 +215,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
         }
 
         // Update storage with the new delivery results
-        let status = self.update_storage(&email, &internal_status);
+        let status = self.update_status(&internal_status);
         if status != WorkerStatus::Ok {
             return status;
         }
@@ -237,7 +237,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
         WorkerStatus::Ok
     }
 
-    fn update_storage(&mut self, email: &Email, internal_status: &InternalStatus)
+    fn update_status(&mut self, internal_status: &InternalStatus)
        -> WorkerStatus
     {
         // Lock the storage
@@ -249,8 +249,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
             },
         };
 
-        // Store the email delivery result (so far) into storage
-        if let Err(e) = (*guard).store(email.clone(), internal_status.clone()) {
+        if let Err(e) = (*guard).update_status(internal_status) {
             error!("{:?}", e);
             return WorkerStatus::StorageWriteFailed;
         }
