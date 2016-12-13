@@ -1,6 +1,11 @@
+NOTE: This crate is still very new and going through a lot of API changes.
+
+NOTE: The newer 0.3.0 version is not on crates.io because it depends on a
+      specific git commit of the lettre crate.
+
 # Mailstrom
 
-[Documentation](https://mikedilger.github.io/mailstrom)
+[Documentation](https://mikedilger.github.io/mailstrom) for 0.3.0
 
 `Mailstrom` is a rust library that handles email delivery for rust programs in a
 background worker thread.  It does the following:
