@@ -215,8 +215,106 @@
 <span id="171">171</span>
 <span id="172">172</span>
 <span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+<span id="224">224</span>
+<span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
+<span id="234">234</span>
+<span id="235">235</span>
+<span id="236">236</span>
+<span id="237">237</span>
+<span id="238">238</span>
+<span id="239">239</span>
+<span id="240">240</span>
+<span id="241">241</span>
+<span id="242">242</span>
+<span id="243">243</span>
 </pre><pre class='rust '>
-<span class='doccomment'>//! Mailstrom handles email delivery.</span>
+<span class='doccomment'>//! Mailstrom handles email delivery in a background worker thread, with the following</span>
+<span class='doccomment'>//! features:</span>
+<span class='doccomment'>//!</span>
+<span class='doccomment'>//! * Accepts an email from the caller and then does everything necessary to get it</span>
+<span class='doccomment'>//!   delivered to all recipients without blocking the caller.</span>
+<span class='doccomment'>//! * Allows the caller to query the status of an earlier submitted email at any time,</span>
+<span class='doccomment'>//!   to determine if it is Queued, Delivered, Deferred, or has Failed, with details</span>
+<span class='doccomment'>//!   as to why, on a per-recipient basis.</span>
+<span class='doccomment'>//! * Handles all parsing, validation, and encoding of email content and headers,</span>
+<span class='doccomment'>//!   in compliance with RFC 5322 (and other RFCs).  Uses the</span>
+<span class='doccomment'>//!   [email-format](https://github.com/mikedilger/email-format) library for this.</span>
+<span class='doccomment'>//! * Looks up the DNS MX records of the recipients, and delivers directly to those Internet</span>
+<span class='doccomment'>//!   mail servers over SMTP, thus not requiring any local SMTP relay.  Uses the</span>
+<span class='doccomment'>//!   [resolv](https://github.com/mikedilger/resolv-rs) library for DNS lookups (via your</span>
+<span class='doccomment'>//!   operating system)</span>
+<span class='doccomment'>//! * SMTP transport &quot;heavy lifting&quot; is performed via the [lettre](https://github.com/lettre/lettre)</span>
+<span class='doccomment'>//!   library.  Uses STARTTLS where available.</span>
+<span class='doccomment'>//! * Retries with exponential backoff for a fixed number of retries (currently fixed at 3),</span>
+<span class='doccomment'>//!   when the send result is Deferred</span>
+<span class='doccomment'>//! * Uses a pluggable user-defined state management (persistence) layer.</span>
+<span class='doccomment'>//!</span>
+<span class='doccomment'>//! ## Limitations</span>
+<span class='doccomment'>//!</span>
+<span class='doccomment'>//! * Only works on glibc based operating systems, due to usage of the `resolv` library.</span>
+<span class='doccomment'>//! * The [email-format](https://github.com/mikedilger/email-format) crate is somewhat incomplete</span>
+<span class='doccomment'>//!   and clunky still.  It doesn&#39;t incorporate RFC 6854 (updated From and Sender syntax) yet.</span>
+<span class='doccomment'>//!   It defines types one-to-one with ABNF parsing units, rather than as semantic units of meaning.</span>
+<span class='doccomment'>//!   And it doesn&#39;t let you use obvious types yet like setting the date from a DateTime type.</span>
+<span class='doccomment'>//!   However, these issues will be worked out in the near future.</span>
 <span class='doccomment'>//!</span>
 <span class='doccomment'>//! You can use it as follows:</span>
 <span class='doccomment'>//!</span>
@@ -247,8 +345,14 @@
 <span class='doccomment'>//!     let mut mailstrom = Mailstrom::new(</span>
 <span class='doccomment'>//!         Config {</span>
 <span class='doccomment'>//!             helo_name: &quot;my.host.domainname&quot;.to_owned(),</span>
+<span class='doccomment'>//!             smtp_timeout_secs: 30,</span>
 <span class='doccomment'>//!         },</span>
 <span class='doccomment'>//!         MemoryStorage::new());</span>
+<span class='doccomment'>//!</span>
+<span class='doccomment'>//!     // We must explicitly tell mailstrom to start actually sending emails.  If we</span>
+<span class='doccomment'>//!     // were only interested in reading the status of previously sent emails, we</span>
+<span class='doccomment'>//!     // would not send this command.</span>
+<span class='doccomment'>//!     mailstrom.start().unwrap();</span>
 <span class='doccomment'>//!</span>
 <span class='doccomment'>//!     let message_id = mailstrom.send_email(email).unwrap();</span>
 <span class='doccomment'>//!</span>
@@ -300,10 +404,11 @@
 <span class='kw'>use</span> <span class='ident'>internal_status</span>::<span class='ident'>InternalStatus</span>;
 <span class='kw'>pub</span> <span class='kw'>use</span> <span class='ident'>storage</span>::{<span class='ident'>MailstromStorage</span>, <span class='ident'>MailstromStorageError</span>, <span class='ident'>MemoryStorage</span>};
 
-
+<span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>, <span class='ident'>Clone</span>)]</span>
 <span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>Config</span>
 {
-    <span class='kw'>pub</span> <span class='ident'>helo_name</span>: <span class='ident'>String</span>
+    <span class='kw'>pub</span> <span class='ident'>helo_name</span>: <span class='ident'>String</span>,
+    <span class='kw'>pub</span> <span class='ident'>smtp_timeout_secs</span>: <span class='ident'>u64</span>,
 }
 
 <span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>Mailstrom</span><span class='op'>&lt;</span><span class='ident'>S</span>: <span class='ident'>MailstromStorage</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span><span class='op'>&gt;</span>
@@ -325,7 +430,8 @@
 
         <span class='kw'>let</span> <span class='ident'>worker_status</span> <span class='op'>=</span> <span class='ident'>Arc</span>::<span class='ident'>new</span>(<span class='ident'>AtomicU8</span>::<span class='ident'>new</span>(<span class='ident'>WorkerStatus</span>::<span class='prelude-val'>Ok</span> <span class='kw'>as</span> <span class='ident'>u8</span>));
 
-        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>worker</span> <span class='op'>=</span> <span class='ident'>Worker</span>::<span class='ident'>new</span>(<span class='ident'>receiver</span>, <span class='ident'>storage</span>.<span class='ident'>clone</span>(), <span class='ident'>worker_status</span>.<span class='ident'>clone</span>(), <span class='kw-2'>&amp;</span><span class='op'>*</span><span class='ident'>config</span>.<span class='ident'>helo_name</span>);
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>worker</span> <span class='op'>=</span> <span class='ident'>Worker</span>::<span class='ident'>new</span>(<span class='ident'>receiver</span>, <span class='ident'>storage</span>.<span class='ident'>clone</span>(), <span class='ident'>worker_status</span>.<span class='ident'>clone</span>(),
+                                     <span class='ident'>config</span>.<span class='ident'>clone</span>());
 
         <span class='kw'>let</span> _ <span class='op'>=</span> <span class='ident'>thread</span>::<span class='ident'>spawn</span>(<span class='kw'>move</span><span class='op'>||</span> {
             <span class='ident'>worker</span>.<span class='ident'>run</span>();
@@ -337,6 +443,15 @@
             <span class='ident'>worker_status</span>: <span class='ident'>worker_status</span>,
             <span class='ident'>storage</span>: <span class='ident'>storage</span>,
         }
+    }
+
+    <span class='doccomment'>/// Mailstrom requires an explicit start command to start sending emails.  This is</span>
+    <span class='doccomment'>/// because some clients are only interested in reading the status of sent emails,</span>
+    <span class='doccomment'>/// and will terminate before any real sending can be accomplished.</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>start</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span>(), <span class='ident'>Error</span><span class='op'>&gt;</span>
+    {
+        <span class='macro'>try</span><span class='macro'>!</span>(<span class='self'>self</span>.<span class='ident'>sender</span>.<span class='ident'>send</span>(<span class='ident'>Message</span>::<span class='ident'>Start</span>));
+        <span class='prelude-val'>Ok</span>(())
     }
 
     <span class='doccomment'>/// Ask Mailstrom to die.  This is not required, you can simply let it fall out</span>
@@ -361,7 +476,18 @@
 
         <span class='kw'>let</span> <span class='ident'>message_id</span> <span class='op'>=</span> <span class='ident'>internal_status</span>.<span class='ident'>message_id</span>.<span class='ident'>clone</span>();
 
-        <span class='macro'>try</span><span class='macro'>!</span>(<span class='self'>self</span>.<span class='ident'>sender</span>.<span class='ident'>send</span>(<span class='ident'>Message</span>::<span class='ident'>SendEmail</span>(<span class='ident'>email</span>, <span class='ident'>internal_status</span>)));
+        {
+            <span class='comment'>// Lock the storage</span>
+            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>guard</span> <span class='op'>=</span> <span class='kw'>match</span> (<span class='op'>*</span><span class='self'>self</span>.<span class='ident'>storage</span>).<span class='ident'>write</span>() {
+                <span class='prelude-val'>Ok</span>(<span class='ident'>guard</span>) <span class='op'>=&gt;</span> <span class='ident'>guard</span>,
+                <span class='prelude-val'>Err</span>(_) <span class='op'>=&gt;</span> <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>Lock</span>),
+            };
+
+            <span class='comment'>// Store the email</span>
+            <span class='macro'>try</span><span class='macro'>!</span>((<span class='op'>*</span><span class='ident'>guard</span>).<span class='ident'>store</span>(<span class='ident'>email</span>, <span class='ident'>internal_status</span>));
+        }
+
+        <span class='macro'>try</span><span class='macro'>!</span>(<span class='self'>self</span>.<span class='ident'>sender</span>.<span class='ident'>send</span>(<span class='ident'>Message</span>::<span class='ident'>SendEmail</span>(<span class='ident'>message_id</span>.<span class='ident'>clone</span>())));
 
         <span class='macro'>info</span><span class='macro'>!</span>(<span class='string'>&quot;Passed email {} off to worker&quot;</span>, <span class='kw-2'>&amp;</span><span class='op'>*</span><span class='ident'>message_id</span>);
 
@@ -379,6 +505,20 @@
         <span class='kw'>let</span> <span class='ident'>status</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>((<span class='op'>*</span><span class='ident'>guard</span>).<span class='ident'>retrieve_status</span>(<span class='ident'>message_id</span>));
 
         <span class='prelude-val'>Ok</span>(<span class='ident'>status</span>.<span class='ident'>as_status</span>())
+    }
+
+    <span class='comment'>// Query recently queued and sent emails. This includes all emails where sending is not</span>
+    <span class='comment'>// yet complete, and also all emails where sending is complete but for which they have</span>
+    <span class='comment'>// not yet been reported on (via this function).</span>
+    <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>query_recent</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>Status</span><span class='op'>&gt;</span>, <span class='ident'>Error</span><span class='op'>&gt;</span>
+    {
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>guard</span> <span class='op'>=</span> <span class='kw'>match</span> (<span class='op'>*</span><span class='self'>self</span>.<span class='ident'>storage</span>).<span class='ident'>write</span>() {
+            <span class='prelude-val'>Ok</span>(<span class='ident'>guard</span>) <span class='op'>=&gt;</span> <span class='ident'>guard</span>,
+            <span class='prelude-val'>Err</span>(_) <span class='op'>=&gt;</span> <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>Lock</span>),
+        };
+
+        <span class='kw'>let</span> <span class='ident'>vec_statuses</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>((<span class='op'>*</span><span class='ident'>guard</span>).<span class='ident'>retrieve_all_recent</span>());
+        <span class='prelude-val'>Ok</span>(<span class='ident'>vec_statuses</span>.<span class='ident'>iter</span>().<span class='ident'>map</span>(<span class='op'>|</span><span class='ident'>s</span><span class='op'>|</span> <span class='ident'>s</span>.<span class='ident'>as_status</span>()).<span class='ident'>collect</span>())
     }
 }
 

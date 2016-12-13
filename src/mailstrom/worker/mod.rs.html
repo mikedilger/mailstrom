@@ -399,10 +399,88 @@
 <span id="355">355</span>
 <span id="356">356</span>
 <span id="357">357</span>
+<span id="358">358</span>
+<span id="359">359</span>
+<span id="360">360</span>
+<span id="361">361</span>
+<span id="362">362</span>
+<span id="363">363</span>
+<span id="364">364</span>
+<span id="365">365</span>
+<span id="366">366</span>
+<span id="367">367</span>
+<span id="368">368</span>
+<span id="369">369</span>
+<span id="370">370</span>
+<span id="371">371</span>
+<span id="372">372</span>
+<span id="373">373</span>
+<span id="374">374</span>
+<span id="375">375</span>
+<span id="376">376</span>
+<span id="377">377</span>
+<span id="378">378</span>
+<span id="379">379</span>
+<span id="380">380</span>
+<span id="381">381</span>
+<span id="382">382</span>
+<span id="383">383</span>
+<span id="384">384</span>
+<span id="385">385</span>
+<span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
+<span id="422">422</span>
+<span id="423">423</span>
+<span id="424">424</span>
+<span id="425">425</span>
+<span id="426">426</span>
+<span id="427">427</span>
+<span id="428">428</span>
+<span id="429">429</span>
+<span id="430">430</span>
+<span id="431">431</span>
+<span id="432">432</span>
+<span id="433">433</span>
+<span id="434">434</span>
 </pre><pre class='rust '>
 
-<span class='kw'>mod</span> <span class='ident'>delivery</span>;
+<span class='kw'>mod</span> <span class='ident'>smtp</span>;
 <span class='kw'>mod</span> <span class='ident'>task</span>;
+<span class='kw'>mod</span> <span class='ident'>mx</span>;
 
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>sync</span>::{<span class='ident'>Arc</span>, <span class='ident'>RwLock</span>};
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>sync</span>::<span class='ident'>mpsc</span>::{<span class='self'>self</span>, <span class='ident'>RecvTimeoutError</span>};
@@ -415,12 +493,18 @@
 <span class='kw'>use</span> <span class='ident'>internal_status</span>::<span class='ident'>InternalStatus</span>;
 <span class='kw'>use</span> <span class='ident'>status</span>::<span class='ident'>DeliveryResult</span>;
 <span class='kw'>use</span> <span class='ident'>storage</span>::<span class='ident'>MailstromStorage</span>;
-<span class='kw'>use</span> <span class='ident'>error</span>::<span class='ident'>Error</span>;
 <span class='kw'>use</span> <span class='self'>self</span>::<span class='ident'>task</span>::{<span class='ident'>Task</span>, <span class='ident'>TaskType</span>};
+<span class='kw'>use</span> <span class='self'>self</span>::<span class='ident'>smtp</span>::<span class='ident'>Envelope</span>;
+<span class='kw'>use</span> ::<span class='ident'>Config</span>;
+
+<span class='kw'>const</span> <span class='ident'>LOOP_DELAY</span>: <span class='ident'>u64</span> <span class='op'>=</span> <span class='number'>10</span>;
 
 <span class='kw'>pub</span> <span class='kw'>enum</span> <span class='ident'>Message</span> {
-    <span class='doccomment'>/// Ask the worker to deliver an email</span>
-    <span class='ident'>SendEmail</span>(<span class='ident'>Email</span>, <span class='ident'>InternalStatus</span>),
+    <span class='doccomment'>/// Start sending emails</span>
+    <span class='ident'>Start</span>,
+    <span class='doccomment'>/// Ask the worker to deliver an email (message_id is provided, Mailstrom will have</span>
+    <span class='doccomment'>/// already stored it)</span>
+    <span class='ident'>SendEmail</span>(<span class='ident'>String</span>),
     <span class='doccomment'>/// Ask the worker to terminate</span>
     <span class='ident'>Terminate</span>,
 }
@@ -433,6 +517,7 @@
     <span class='ident'>ChannelDisconnected</span> <span class='op'>=</span> <span class='number'>2</span>,
     <span class='ident'>LockPoisoned</span> <span class='op'>=</span> <span class='number'>3</span>,
     <span class='ident'>StorageWriteFailed</span> <span class='op'>=</span> <span class='number'>4</span>,
+    <span class='ident'>StorageReadFailed</span> <span class='op'>=</span> <span class='number'>5</span>,
     <span class='ident'>Unknown</span> <span class='op'>=</span> <span class='number'>255</span>,
 }
 <span class='kw'>impl</span> <span class='ident'>WorkerStatus</span> {
@@ -454,13 +539,15 @@
 
     <span class='ident'>worker_status</span>: <span class='ident'>Arc</span><span class='op'>&lt;</span><span class='ident'>AtomicU8</span><span class='op'>&gt;</span>,
 
-    <span class='ident'>helo_name</span>: <span class='ident'>String</span>,
+    <span class='ident'>config</span>: <span class='ident'>Config</span>,
 
     <span class='comment'>// Persistent shared storage</span>
     <span class='ident'>storage</span>: <span class='ident'>Arc</span><span class='op'>&lt;</span><span class='ident'>RwLock</span><span class='op'>&lt;</span><span class='ident'>S</span><span class='op'>&gt;&gt;</span>,
 
     <span class='comment'>// A list of tasks we need to do later, sorted in time order</span>
-    <span class='ident'>tasks</span>: <span class='ident'>BTreeSet</span><span class='op'>&lt;</span><span class='ident'>Task</span><span class='op'>&gt;</span>
+    <span class='ident'>tasks</span>: <span class='ident'>BTreeSet</span><span class='op'>&lt;</span><span class='ident'>Task</span><span class='op'>&gt;</span>,
+
+    <span class='ident'>paused</span>: <span class='ident'>bool</span>
 }
 
 <span class='kw'>impl</span><span class='op'>&lt;</span><span class='ident'>S</span>: <span class='ident'>MailstromStorage</span> <span class='op'>+</span> <span class='lifetime'>&#39;static</span><span class='op'>&gt;</span> <span class='ident'>Worker</span><span class='op'>&lt;</span><span class='ident'>S</span><span class='op'>&gt;</span>
@@ -468,41 +555,83 @@
     <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>new</span>(<span class='ident'>receiver</span>: <span class='ident'>mpsc</span>::<span class='ident'>Receiver</span><span class='op'>&lt;</span><span class='ident'>Message</span><span class='op'>&gt;</span>,
                <span class='ident'>storage</span>: <span class='ident'>Arc</span><span class='op'>&lt;</span><span class='ident'>RwLock</span><span class='op'>&lt;</span><span class='ident'>S</span><span class='op'>&gt;&gt;</span>,
                <span class='ident'>worker_status</span>: <span class='ident'>Arc</span><span class='op'>&lt;</span><span class='ident'>AtomicU8</span><span class='op'>&gt;</span>,
-               <span class='ident'>helo_name</span>: <span class='kw-2'>&amp;</span><span class='ident'>str</span>)
+               <span class='ident'>config</span>: <span class='ident'>Config</span>)
                <span class='op'>-&gt;</span> <span class='ident'>Worker</span><span class='op'>&lt;</span><span class='ident'>S</span><span class='op'>&gt;</span>
     {
-        <span class='ident'>Worker</span> {
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>worker</span> <span class='op'>=</span> <span class='ident'>Worker</span> {
             <span class='ident'>receiver</span>: <span class='ident'>receiver</span>,
             <span class='ident'>worker_status</span>: <span class='ident'>worker_status</span>,
-            <span class='ident'>helo_name</span>: <span class='ident'>helo_name</span>.<span class='ident'>to_owned</span>(),
+            <span class='ident'>config</span>: <span class='ident'>config</span>,
             <span class='ident'>storage</span>: <span class='ident'>storage</span>,
             <span class='ident'>tasks</span>: <span class='ident'>BTreeSet</span>::<span class='ident'>new</span>(),
+            <span class='ident'>paused</span>: <span class='bool-val'>true</span>,
+        };
+
+        <span class='comment'>// Load the incomplete (deferred) email statuses, for tasking</span>
+        <span class='kw'>if</span> <span class='kw'>let</span> <span class='prelude-val'>Ok</span>(<span class='ident'>guard</span>) <span class='op'>=</span> (<span class='op'>*</span><span class='ident'>worker</span>.<span class='ident'>storage</span>).<span class='ident'>write</span>() {
+            <span class='kw'>if</span> <span class='kw'>let</span> <span class='prelude-val'>Ok</span>(<span class='kw-2'>mut</span> <span class='ident'>isvec</span>) <span class='op'>=</span> (<span class='op'>*</span><span class='ident'>guard</span>).<span class='ident'>retrieve_all_incomplete</span>() {
+                <span class='comment'>// Create one task for each deferred email</span>
+                <span class='kw'>for</span> <span class='ident'>is</span> <span class='kw'>in</span> <span class='ident'>isvec</span>.<span class='ident'>drain</span>(..) {
+                    <span class='ident'>worker</span>.<span class='ident'>tasks</span>.<span class='ident'>insert</span>( <span class='ident'>Task</span> {
+                        <span class='ident'>tasktype</span>: <span class='ident'>TaskType</span>::<span class='ident'>Resend</span>,
+                        <span class='ident'>time</span>: <span class='ident'>Instant</span>::<span class='ident'>now</span>(),
+                        <span class='ident'>message_id</span>: <span class='ident'>is</span>.<span class='ident'>message_id</span>.<span class='ident'>clone</span>(),
+                    });
+                }
+            } <span class='kw'>else</span> {
+                <span class='ident'>worker</span>.<span class='ident'>worker_status</span>.<span class='ident'>store</span>(<span class='ident'>WorkerStatus</span>::<span class='ident'>StorageReadFailed</span> <span class='kw'>as</span> <span class='ident'>u8</span>,
+                                           <span class='ident'>Ordering</span>::<span class='ident'>SeqCst</span>);
+            }
+        } <span class='kw'>else</span> {
+            <span class='ident'>worker</span>.<span class='ident'>worker_status</span>.<span class='ident'>store</span>(<span class='ident'>WorkerStatus</span>::<span class='ident'>LockPoisoned</span> <span class='kw'>as</span> <span class='ident'>u8</span>,
+                                       <span class='ident'>Ordering</span>::<span class='ident'>SeqCst</span>);
         }
+
+        <span class='ident'>worker</span>
     }
 
     <span class='kw'>pub</span> <span class='kw'>fn</span> <span class='ident'>run</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>) {
 
-        <span class='comment'>// This timeout represents how long we wait for a message.  If there are any</span>
-        <span class='comment'>// tasks in the tasklist, this will be the tiem until the first task is</span>
-        <span class='comment'>// due.  Otherwise it is set to 60 seconds.</span>
-        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>timeout</span>: <span class='ident'>Duration</span> <span class='op'>=</span> <span class='ident'>Duration</span>::<span class='ident'>from_secs</span>(<span class='number'>60</span>);
-
         <span class='kw'>loop</span> {
+            <span class='comment'>// Compute the timeout</span>
+            <span class='comment'>// This timeout represents how long we wait for a message.  If there are any</span>
+            <span class='comment'>// tasks in the tasklist (and we are not paused), this will be the time until</span>
+            <span class='comment'>// the first task is due.  Otherwise it is set to LOOP_DELAY seconds.</span>
+            <span class='kw'>let</span> <span class='ident'>timeout</span>: <span class='ident'>Duration</span> <span class='op'>=</span> <span class='kw'>if</span> <span class='self'>self</span>.<span class='ident'>paused</span> {
+                <span class='macro'>debug</span><span class='macro'>!</span>(<span class='string'>&quot;(worker) loop start (paused)&quot;</span>);
+                <span class='ident'>Duration</span>::<span class='ident'>from_secs</span>(<span class='ident'>LOOP_DELAY</span>)
+            }
+            <span class='kw'>else</span> <span class='kw'>if</span> <span class='kw'>let</span> <span class='prelude-val'>Some</span>(<span class='ident'>task</span>) <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>tasks</span>.<span class='ident'>iter</span>().<span class='ident'>next</span>() {
+                <span class='macro'>debug</span><span class='macro'>!</span>(<span class='string'>&quot;(worker) loop start (tasks in queue)&quot;</span>);
+                <span class='kw'>let</span> <span class='ident'>now</span> <span class='op'>=</span> <span class='ident'>Instant</span>::<span class='ident'>now</span>();
+                <span class='kw'>if</span> <span class='ident'>task</span>.<span class='ident'>time</span> <span class='op'>&gt;</span> <span class='ident'>now</span> {
+                    <span class='ident'>task</span>.<span class='ident'>time</span> <span class='op'>-</span> <span class='ident'>now</span>
+                } <span class='kw'>else</span> {
+                    <span class='ident'>Duration</span>::<span class='ident'>new</span>(<span class='number'>0</span>,<span class='number'>0</span>) <span class='comment'>// overdue!</span>
+                }
+            } <span class='kw'>else</span> {
+                <span class='macro'>debug</span><span class='macro'>!</span>(<span class='string'>&quot;(worker) loop start (no tasks)&quot;</span>);
+                <span class='ident'>Duration</span>::<span class='ident'>from_secs</span>(<span class='ident'>LOOP_DELAY</span>)
+            };
+
             <span class='macro'>debug</span><span class='macro'>!</span>(<span class='string'>&quot;(worker) waiting for a message ({} seconds)&quot;</span>, <span class='ident'>timeout</span>.<span class='ident'>as_secs</span>());
 
             <span class='comment'>// Receive a message.  Waiting at most until the time when the next task</span>
-            <span class='comment'>// is due, or 60 seconds if there are no tasks</span>
+            <span class='comment'>// is due, or LOOP_DELAY seconds if there are no tasks</span>
             <span class='kw'>match</span> <span class='self'>self</span>.<span class='ident'>receiver</span>.<span class='ident'>recv_timeout</span>(<span class='ident'>timeout</span>) {
                 <span class='prelude-val'>Ok</span>(<span class='ident'>message</span>) <span class='op'>=&gt;</span> <span class='kw'>match</span> <span class='ident'>message</span> {
-                    <span class='ident'>Message</span>::<span class='ident'>SendEmail</span>(<span class='ident'>email</span>, <span class='ident'>internal_status</span>) <span class='op'>=&gt;</span> {
+                    <span class='ident'>Message</span>::<span class='ident'>Start</span> <span class='op'>=&gt;</span> {
+                        <span class='self'>self</span>.<span class='ident'>paused</span> <span class='op'>=</span> <span class='bool-val'>false</span>;
+                    },
+                    <span class='ident'>Message</span>::<span class='ident'>SendEmail</span>(<span class='ident'>message_id</span>) <span class='op'>=&gt;</span> {
                         <span class='macro'>debug</span><span class='macro'>!</span>(<span class='string'>&quot;(worker) received SendEmail command&quot;</span>);
-                        <span class='kw'>let</span> <span class='ident'>worker_status</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>send_email</span>(<span class='ident'>email</span>, <span class='ident'>internal_status</span>);
-                        <span class='kw'>if</span> <span class='ident'>worker_status</span> <span class='op'>!=</span> <span class='ident'>WorkerStatus</span>::<span class='prelude-val'>Ok</span> {
-                            <span class='self'>self</span>.<span class='ident'>worker_status</span>.<span class='ident'>store</span>(<span class='ident'>worker_status</span> <span class='kw'>as</span> <span class='ident'>u8</span>,
-                                                     <span class='ident'>Ordering</span>::<span class='ident'>SeqCst</span>);
-                            <span class='macro'>info</span><span class='macro'>!</span>(<span class='string'>&quot;(worker) failed and terminated&quot;</span>);
-                            <span class='kw'>return</span>;
-                        }
+                        <span class='comment'>// Create a task (don&#39;t do it right away) so we can more easily</span>
+                        <span class='comment'>// code pause-continue logic and eventually multiple worker threads</span>
+                        <span class='self'>self</span>.<span class='ident'>tasks</span>.<span class='ident'>insert</span>( <span class='ident'>Task</span> {
+                            <span class='ident'>tasktype</span>: <span class='ident'>TaskType</span>::<span class='ident'>Resend</span>,
+                            <span class='ident'>time</span>: <span class='ident'>Instant</span>::<span class='ident'>now</span>(),
+                            <span class='ident'>message_id</span>: <span class='ident'>message_id</span>,
+                        });
                     }
                     <span class='ident'>Message</span>::<span class='ident'>Terminate</span> <span class='op'>=&gt;</span> {
                         <span class='macro'>debug</span><span class='macro'>!</span>(<span class='string'>&quot;(worker) received Terminate command&quot;</span>);
@@ -521,127 +650,96 @@
                 }
             };
 
-            <span class='comment'>// Copy out all the tasks that are due</span>
-            <span class='kw'>let</span> <span class='ident'>now</span> <span class='op'>=</span> <span class='ident'>Instant</span>::<span class='ident'>now</span>();
-            <span class='kw'>let</span> <span class='ident'>due_tasks</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>Task</span><span class='op'>&gt;</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>tasks</span>.<span class='ident'>iter</span>()
-                .<span class='ident'>filter</span>(<span class='op'>|</span><span class='ident'>t</span><span class='op'>|</span> <span class='ident'>now</span> <span class='op'>&gt;</span> <span class='ident'>t</span>.<span class='ident'>time</span>).<span class='ident'>cloned</span>().<span class='ident'>collect</span>();
+            <span class='kw'>if</span> <span class='op'>!</span> <span class='self'>self</span>.<span class='ident'>paused</span> {
+                <span class='comment'>// Copy out all the tasks that are due</span>
+                <span class='kw'>let</span> <span class='ident'>now</span> <span class='op'>=</span> <span class='ident'>Instant</span>::<span class='ident'>now</span>();
+                <span class='kw'>let</span> <span class='ident'>due_tasks</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>Task</span><span class='op'>&gt;</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>tasks</span>.<span class='ident'>iter</span>()
+                    .<span class='ident'>filter</span>(<span class='op'>|</span><span class='ident'>t</span><span class='op'>|</span> <span class='ident'>now</span> <span class='op'>&gt;</span> <span class='ident'>t</span>.<span class='ident'>time</span>).<span class='ident'>cloned</span>().<span class='ident'>collect</span>();
 
-            <span class='comment'>// Handle all these due tasks</span>
-            <span class='kw'>for</span> <span class='ident'>task</span> <span class='kw'>in</span> <span class='kw-2'>&amp;</span><span class='ident'>due_tasks</span> {
-                <span class='kw'>let</span> <span class='ident'>worker_status</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>handle_task</span>(<span class='ident'>task</span>);
-                <span class='kw'>if</span> <span class='ident'>worker_status</span> <span class='op'>!=</span> <span class='ident'>WorkerStatus</span>::<span class='prelude-val'>Ok</span> {
-                    <span class='self'>self</span>.<span class='ident'>worker_status</span>.<span class='ident'>store</span>(<span class='ident'>worker_status</span> <span class='kw'>as</span> <span class='ident'>u8</span>,
-                                             <span class='ident'>Ordering</span>::<span class='ident'>SeqCst</span>);
-                    <span class='macro'>debug</span><span class='macro'>!</span>(<span class='string'>&quot;(worker) failed and terminated&quot;</span>);
-                    <span class='kw'>return</span>;
+                <span class='comment'>// Handle all these due tasks</span>
+                <span class='kw'>for</span> <span class='ident'>task</span> <span class='kw'>in</span> <span class='kw-2'>&amp;</span><span class='ident'>due_tasks</span> {
+                    <span class='kw'>let</span> <span class='ident'>worker_status</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>handle_task</span>(<span class='ident'>task</span>);
+                    <span class='kw'>if</span> <span class='ident'>worker_status</span> <span class='op'>!=</span> <span class='ident'>WorkerStatus</span>::<span class='prelude-val'>Ok</span> {
+                        <span class='self'>self</span>.<span class='ident'>worker_status</span>.<span class='ident'>store</span>(<span class='ident'>worker_status</span> <span class='kw'>as</span> <span class='ident'>u8</span>,
+                                                 <span class='ident'>Ordering</span>::<span class='ident'>SeqCst</span>);
+                        <span class='macro'>debug</span><span class='macro'>!</span>(<span class='string'>&quot;(worker) failed and terminated&quot;</span>);
+                        <span class='kw'>return</span>;
+                    }
+                    <span class='self'>self</span>.<span class='ident'>tasks</span>.<span class='ident'>remove</span>(<span class='ident'>task</span>);
                 }
-                <span class='self'>self</span>.<span class='ident'>tasks</span>.<span class='ident'>remove</span>(<span class='ident'>task</span>);
             }
-
-            <span class='comment'>// Recompute the timeout</span>
-            <span class='kw'>let</span> <span class='ident'>now</span> <span class='op'>=</span> <span class='ident'>Instant</span>::<span class='ident'>now</span>();
-            <span class='ident'>timeout</span> <span class='op'>=</span> <span class='kw'>if</span> <span class='kw'>let</span> <span class='prelude-val'>Some</span>(<span class='ident'>task</span>) <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>tasks</span>.<span class='ident'>iter</span>().<span class='ident'>next</span>() {
-                <span class='macro'>debug</span><span class='macro'>!</span>(<span class='string'>&quot;(worker) looping (tasks in queue)&quot;</span>);
-                <span class='kw'>if</span> <span class='ident'>task</span>.<span class='ident'>time</span> <span class='op'>&gt;</span> <span class='ident'>now</span> {
-                    <span class='ident'>task</span>.<span class='ident'>time</span> <span class='op'>-</span> <span class='ident'>now</span>
-                } <span class='kw'>else</span> {
-                    <span class='ident'>Duration</span>::<span class='ident'>new</span>(<span class='number'>0</span>,<span class='number'>0</span>) <span class='comment'>// overdue!</span>
-                }
-            } <span class='kw'>else</span> {
-                <span class='macro'>debug</span><span class='macro'>!</span>(<span class='string'>&quot;(worker) looping (no tasks)&quot;</span>);
-                <span class='ident'>Duration</span>::<span class='ident'>from_secs</span>(<span class='number'>60</span>)
-            };
         }
     }
 
     <span class='kw'>fn</span> <span class='ident'>send_email</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>, <span class='ident'>email</span>: <span class='ident'>Email</span>, <span class='kw-2'>mut</span> <span class='ident'>internal_status</span>: <span class='ident'>InternalStatus</span>)
                   <span class='op'>-&gt;</span> <span class='ident'>WorkerStatus</span>
     {
-        <span class='ident'>get_mx_records_for_email</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>internal_status</span>);
-
-        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>some_deferred_with_attempts</span>: <span class='prelude-ty'>Option</span><span class='op'>&lt;</span><span class='ident'>u8</span><span class='op'>&gt;</span> <span class='op'>=</span> <span class='prelude-val'>None</span>;
-
-        <span class='lifetime'>&#39;next_recipient</span>:
-        <span class='kw'>for</span> <span class='ident'>recipient</span> <span class='kw'>in</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>internal_status</span>.<span class='ident'>recipients</span> {
-
-            <span class='comment'>// Skip if already completed</span>
-            <span class='kw'>match</span> <span class='ident'>recipient</span>.<span class='ident'>result</span> {
-                <span class='ident'>DeliveryResult</span>::<span class='ident'>Delivered</span>(_) <span class='op'>=&gt;</span> <span class='kw'>continue</span>,
-                <span class='ident'>DeliveryResult</span>::<span class='ident'>Failed</span>(_) <span class='op'>=&gt;</span> <span class='kw'>continue</span>,
-                _ <span class='op'>=&gt;</span> {}
-            }
-
-            <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>attempt</span>: <span class='ident'>u8</span> <span class='op'>=</span> <span class='number'>0</span>;
-            <span class='kw'>let</span> <span class='ident'>deferred_data</span>: <span class='prelude-ty'>Option</span><span class='op'>&lt;</span>(<span class='ident'>u8</span>, <span class='ident'>String</span>)<span class='op'>&gt;</span> <span class='op'>=</span>
-                <span class='kw'>if</span> <span class='kw'>let</span> <span class='ident'>DeliveryResult</span>::<span class='ident'>Deferred</span>(<span class='ident'>a</span>, <span class='kw-2'>ref</span> <span class='ident'>msg</span>) <span class='op'>=</span> <span class='ident'>recipient</span>.<span class='ident'>result</span> {
-                    <span class='prelude-val'>Some</span>((<span class='ident'>a</span>, <span class='ident'>msg</span>.<span class='ident'>clone</span>()))
-                } <span class='kw'>else</span> {
-                    <span class='prelude-val'>None</span>
-                };
-            <span class='kw'>if</span> <span class='ident'>deferred_data</span>.<span class='ident'>is_some</span>() {
-                <span class='kw'>let</span> (<span class='ident'>a</span>,<span class='ident'>msg</span>) <span class='op'>=</span> <span class='ident'>deferred_data</span>.<span class='ident'>unwrap</span>();
-                <span class='comment'>// Try again</span>
-                <span class='ident'>attempt</span> <span class='op'>=</span> <span class='ident'>a</span> <span class='op'>+</span> <span class='number'>1</span>;
-                <span class='kw'>if</span> <span class='ident'>a</span> <span class='op'>==</span> <span class='number'>3</span> {
-                    <span class='comment'>// Or fail if too many attempts</span>
-                    <span class='macro'>debug</span><span class='macro'>!</span>(<span class='string'>&quot;(worker) delivery failed after 3 attempts.&quot;</span>);
-                    <span class='ident'>recipient</span>.<span class='ident'>result</span> <span class='op'>=</span> <span class='ident'>DeliveryResult</span>::<span class='ident'>Failed</span>(
-                        <span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;Failed after 3 attempts: {}&quot;</span>, <span class='ident'>msg</span>));
-                    <span class='kw'>continue</span>;
-                }
-            }
-
-            <span class='comment'>// Skip (and complete) if no MX servers</span>
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>need_mx</span>: <span class='ident'>bool</span> <span class='op'>=</span> <span class='bool-val'>false</span>;
+        <span class='kw'>for</span> <span class='ident'>recipient</span> <span class='kw'>in</span> <span class='kw-2'>&amp;</span><span class='ident'>internal_status</span>.<span class='ident'>recipients</span> {
             <span class='kw'>if</span> <span class='ident'>recipient</span>.<span class='ident'>mx_servers</span>.<span class='ident'>is_none</span>() {
-                <span class='macro'>debug</span><span class='macro'>!</span>(<span class='string'>&quot;(worker) delivery failed (no valid MX records).&quot;</span>);
-                <span class='ident'>recipient</span>.<span class='ident'>result</span> <span class='op'>=</span> <span class='ident'>DeliveryResult</span>::<span class='ident'>Failed</span>(
-                    <span class='string'>&quot;MX records found but none are valid&quot;</span>.<span class='ident'>to_owned</span>());
-                <span class='kw'>continue</span>;
-            }
-
-            <span class='comment'>// Sequence through MX servers</span>
-            <span class='kw'>let</span> <span class='ident'>mx_servers</span>: <span class='kw-2'>&amp;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>SocketAddr</span><span class='op'>&gt;</span> <span class='op'>=</span> <span class='ident'>recipient</span>.<span class='ident'>mx_servers</span>.<span class='ident'>as_ref</span>().<span class='ident'>unwrap</span>();
-
-            <span class='kw'>for</span> <span class='ident'>i</span> <span class='kw'>in</span> <span class='ident'>recipient</span>.<span class='ident'>current_mx</span> .. <span class='ident'>mx_servers</span>.<span class='ident'>len</span>() {
-
-                <span class='comment'>/*
-                // Mark completed if this MX server is known to have been successfully
-                // delivered to already
-                // THIS DOES NOT WORK DUE TO THE RECIPIENTS PREVIOUSLY NOT INCLUDING THIS
-                // CURRENT RECIPIENT: SEE BUG #3
-                if internal_status.delivered_to_mx.contains(&amp;mx_servers[i]) {
-                    debug!(&quot;(worker) delivery skipped (was delivered with other recipients).&quot;);
-                    recipient.result = DeliveryResult::Delivered(
-                        &quot;[was delivered along with another recipients delivery]&quot;.to_owned());
-                    continue &#39;next_recipient;
-                }
-                 */</span>
-
-                <span class='comment'>// Attempt delivery to this MX server</span>
-                <span class='ident'>recipient</span>.<span class='ident'>result</span> <span class='op'>=</span> ::<span class='ident'>worker</span>::<span class='ident'>delivery</span>::<span class='ident'>mx_delivery</span>(
-                    <span class='kw-2'>&amp;</span><span class='ident'>email</span>, <span class='ident'>internal_status</span>.<span class='ident'>message_id</span>.<span class='ident'>clone</span>(),
-                    <span class='kw-2'>&amp;</span><span class='ident'>mx_servers</span>[<span class='ident'>i</span>], <span class='kw-2'>&amp;</span><span class='op'>*</span><span class='self'>self</span>.<span class='ident'>helo_name</span>, <span class='ident'>attempt</span>);
-
-                <span class='kw'>match</span> <span class='ident'>recipient</span>.<span class='ident'>result</span> {
-                    <span class='ident'>DeliveryResult</span>::<span class='ident'>Delivered</span>(_) <span class='op'>=&gt;</span> {
-                        <span class='comment'>// save in delivered_to_mx list</span>
-                        <span class='ident'>internal_status</span>.<span class='ident'>delivered_to_mx</span>.<span class='ident'>push</span>(<span class='ident'>mx_servers</span>[<span class='ident'>i</span>].<span class='ident'>clone</span>());
-                        <span class='comment'>// Exit mx loop</span>
-                        <span class='kw'>break</span>;
-                    },
-                    <span class='ident'>DeliveryResult</span>::<span class='ident'>Deferred</span>(_,_) <span class='op'>=&gt;</span> { } <span class='comment'>// continue MX loop</span>
-                    _ <span class='op'>=&gt;</span> {
-                        <span class='comment'>// Exit mx loop</span>
-                        <span class='kw'>break</span>;
-                    }
-                }
-            }
-
-            <span class='kw'>if</span> <span class='kw'>let</span> <span class='ident'>DeliveryResult</span>::<span class='ident'>Deferred</span>(<span class='ident'>a</span>, _) <span class='op'>=</span> <span class='ident'>recipient</span>.<span class='ident'>result</span> {
-                <span class='ident'>some_deferred_with_attempts</span> <span class='op'>=</span> <span class='prelude-val'>Some</span>(<span class='ident'>a</span>);
+                <span class='ident'>need_mx</span><span class='op'>=</span><span class='bool-val'>true</span>;
+                <span class='kw'>break</span>;
             }
         }
 
+        <span class='kw'>if</span> <span class='ident'>need_mx</span> {
+            ::<span class='ident'>worker</span>::<span class='ident'>mx</span>::<span class='ident'>get_mx_records_for_email</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>internal_status</span>);
+
+            <span class='comment'>// Update storage with this MX information</span>
+            <span class='kw'>let</span> <span class='ident'>status</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>update_status</span>(<span class='kw-2'>&amp;</span><span class='ident'>internal_status</span>);
+            <span class='kw'>if</span> <span class='ident'>status</span> <span class='op'>!=</span> <span class='ident'>WorkerStatus</span>::<span class='prelude-val'>Ok</span> {
+                <span class='kw'>return</span> <span class='ident'>status</span>;
+            }
+        }
+
+        <span class='comment'>// Fail all recipients after too many worker attempts</span>
+        <span class='kw'>if</span> <span class='ident'>internal_status</span>.<span class='ident'>attempts_remaining</span> <span class='op'>==</span> <span class='number'>0</span> {
+            <span class='kw'>for</span> <span class='ident'>recipient</span> <span class='kw'>in</span> <span class='ident'>internal_status</span>.<span class='ident'>recipients</span>.<span class='ident'>iter_mut</span>() {
+                <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>data</span>: <span class='prelude-ty'>Option</span><span class='op'>&lt;</span>(<span class='ident'>u8</span>, <span class='ident'>String</span>)<span class='op'>&gt;</span> <span class='op'>=</span> <span class='prelude-val'>None</span>;
+                <span class='kw'>if</span> <span class='kw'>let</span> <span class='ident'>DeliveryResult</span>::<span class='ident'>Deferred</span>(<span class='ident'>attempts</span>, <span class='kw-2'>ref</span> <span class='ident'>msg</span>) <span class='op'>=</span> <span class='ident'>recipient</span>.<span class='ident'>result</span> {
+                    <span class='ident'>data</span> <span class='op'>=</span> <span class='prelude-val'>Some</span>((<span class='ident'>attempts</span>, <span class='ident'>msg</span>.<span class='ident'>clone</span>()));
+                }
+                <span class='kw'>if</span> <span class='ident'>data</span>.<span class='ident'>is_some</span>() {
+                    <span class='kw'>let</span> (<span class='ident'>attempts</span>,<span class='ident'>msg</span>) <span class='op'>=</span> <span class='ident'>data</span>.<span class='ident'>unwrap</span>();
+                    <span class='ident'>recipient</span>.<span class='ident'>result</span> <span class='op'>=</span> <span class='ident'>DeliveryResult</span>::<span class='ident'>Failed</span>(
+                        <span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;Too many attempts ({}): {}&quot;</span>, <span class='ident'>attempts</span>, <span class='ident'>msg</span>));
+                }
+            }
+        }
+
+        <span class='comment'>// Attempt delivery of the email</span>
+        <span class='kw'>if</span> <span class='ident'>deliver</span>(<span class='kw-2'>&amp;</span><span class='ident'>email</span>, <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>internal_status</span>, <span class='kw-2'>&amp;</span><span class='self'>self</span>.<span class='ident'>config</span>) {
+            <span class='ident'>internal_status</span>.<span class='ident'>attempts_remaining</span> <span class='op'>=</span> <span class='number'>0</span>;
+        } <span class='kw'>else</span> {
+            <span class='ident'>internal_status</span>.<span class='ident'>attempts_remaining</span> <span class='op'>=</span> <span class='ident'>internal_status</span>.<span class='ident'>attempts_remaining</span> <span class='op'>-</span> <span class='number'>1</span>;
+        }
+
+        <span class='comment'>// Update storage with the new delivery results</span>
+        <span class='kw'>let</span> <span class='ident'>status</span> <span class='op'>=</span> <span class='self'>self</span>.<span class='ident'>update_status</span>(<span class='kw-2'>&amp;</span><span class='ident'>internal_status</span>);
+        <span class='kw'>if</span> <span class='ident'>status</span> <span class='op'>!=</span> <span class='ident'>WorkerStatus</span>::<span class='prelude-val'>Ok</span> {
+            <span class='kw'>return</span> <span class='ident'>status</span>;
+        }
+
+        <span class='kw'>if</span> <span class='ident'>internal_status</span>.<span class='ident'>attempts_remaining</span> <span class='op'>&gt;</span> <span class='number'>0</span> {
+            <span class='kw'>let</span> <span class='ident'>attempt</span> <span class='op'>=</span> <span class='number'>3</span> <span class='op'>-</span> <span class='ident'>internal_status</span>.<span class='ident'>attempts_remaining</span>;
+            <span class='kw'>let</span> <span class='ident'>delay</span> <span class='op'>=</span> <span class='ident'>Duration</span>::<span class='ident'>from_secs</span>(<span class='number'>60</span> <span class='op'>*</span> <span class='number'>3u64</span>.<span class='ident'>pow</span>(<span class='ident'>attempt</span> <span class='kw'>as</span> <span class='ident'>u32</span>));
+            <span class='macro'>trace</span><span class='macro'>!</span>(<span class='string'>&quot;Queueing task to retry {} in {} seconds&quot;</span>,
+                   <span class='kw-2'>&amp;</span><span class='ident'>internal_status</span>.<span class='ident'>message_id</span>, <span class='ident'>delay</span>.<span class='ident'>as_secs</span>());
+
+            <span class='comment'>// Create a new worker task to retry later</span>
+            <span class='self'>self</span>.<span class='ident'>tasks</span>.<span class='ident'>insert</span>( <span class='ident'>Task</span> {
+                <span class='ident'>tasktype</span>: <span class='ident'>TaskType</span>::<span class='ident'>Resend</span>,
+                <span class='ident'>time</span>: <span class='ident'>Instant</span>::<span class='ident'>now</span>() <span class='op'>+</span> <span class='ident'>delay</span>,
+                <span class='ident'>message_id</span>: <span class='ident'>internal_status</span>.<span class='ident'>message_id</span>.<span class='ident'>clone</span>(),
+            });
+        }
+
+        <span class='ident'>WorkerStatus</span>::<span class='prelude-val'>Ok</span>
+    }
+
+    <span class='kw'>fn</span> <span class='ident'>update_status</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>, <span class='ident'>internal_status</span>: <span class='kw-2'>&amp;</span><span class='ident'>InternalStatus</span>)
+       <span class='op'>-&gt;</span> <span class='ident'>WorkerStatus</span>
+    {
         <span class='comment'>// Lock the storage</span>
         <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>guard</span> <span class='op'>=</span> <span class='kw'>match</span> (<span class='op'>*</span><span class='self'>self</span>.<span class='ident'>storage</span>).<span class='ident'>write</span>() {
             <span class='prelude-val'>Ok</span>(<span class='ident'>guard</span>) <span class='op'>=&gt;</span> <span class='ident'>guard</span>,
@@ -651,19 +749,9 @@
             },
         };
 
-        <span class='comment'>// Store the email delivery result (so far) into storage</span>
-        <span class='kw'>if</span> <span class='kw'>let</span> <span class='prelude-val'>Err</span>(<span class='ident'>e</span>) <span class='op'>=</span> (<span class='op'>*</span><span class='ident'>guard</span>).<span class='ident'>store</span>(<span class='kw-2'>&amp;</span><span class='ident'>email</span>, <span class='kw-2'>&amp;</span><span class='ident'>internal_status</span>) {
+        <span class='kw'>if</span> <span class='kw'>let</span> <span class='prelude-val'>Err</span>(<span class='ident'>e</span>) <span class='op'>=</span> (<span class='op'>*</span><span class='ident'>guard</span>).<span class='ident'>update_status</span>(<span class='ident'>internal_status</span>.<span class='ident'>clone</span>()) {
             <span class='macro'>error</span><span class='macro'>!</span>(<span class='string'>&quot;{:?}&quot;</span>, <span class='ident'>e</span>);
             <span class='kw'>return</span> <span class='ident'>WorkerStatus</span>::<span class='ident'>StorageWriteFailed</span>;
-        }
-
-        <span class='kw'>if</span> <span class='kw'>let</span> <span class='prelude-val'>Some</span>(<span class='ident'>attempts</span>) <span class='op'>=</span> <span class='ident'>some_deferred_with_attempts</span> {
-            <span class='comment'>// Create a new worker task to retry later</span>
-            <span class='self'>self</span>.<span class='ident'>tasks</span>.<span class='ident'>insert</span>( <span class='ident'>Task</span> {
-                <span class='ident'>tasktype</span>: <span class='ident'>TaskType</span>::<span class='ident'>Resend</span>,
-                <span class='ident'>time</span>: <span class='ident'>Instant</span>::<span class='ident'>now</span>() <span class='op'>+</span> <span class='ident'>Duration</span>::<span class='ident'>from_secs</span>(<span class='number'>60</span> <span class='op'>*</span> <span class='number'>3u64</span>.<span class='ident'>pow</span>(<span class='ident'>attempts</span> <span class='kw'>as</span> <span class='ident'>u32</span>)),
-                <span class='ident'>message_id</span>: <span class='ident'>internal_status</span>.<span class='ident'>message_id</span>.<span class='ident'>clone</span>(),
-            });
         }
 
         <span class='ident'>WorkerStatus</span>::<span class='prelude-val'>Ok</span>
@@ -692,70 +780,136 @@
     }
 }
 
-<span class='comment'>// Get MX records for email recipients</span>
-<span class='kw'>fn</span> <span class='ident'>get_mx_records_for_email</span>(<span class='ident'>internal_status</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>InternalStatus</span>)
-{
-    <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>net</span>::{<span class='ident'>SocketAddr</span>, <span class='ident'>ToSocketAddrs</span>};
-
-    <span class='comment'>// Look-up the MX records for each recipient</span>
-    <span class='kw'>for</span> <span class='ident'>recipient</span> <span class='kw'>in</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>internal_status</span>.<span class='ident'>recipients</span> {
-        <span class='kw'>let</span> <span class='ident'>mx_records</span> <span class='op'>=</span> <span class='kw'>match</span> <span class='ident'>get_mx_records_for_domain</span>(<span class='kw-2'>&amp;</span><span class='op'>*</span><span class='ident'>recipient</span>.<span class='ident'>domain</span>) {
-            <span class='prelude-val'>Err</span>(<span class='ident'>e</span>) <span class='op'>=&gt;</span> {
-                <span class='ident'>recipient</span>.<span class='ident'>result</span> <span class='op'>=</span> <span class='ident'>DeliveryResult</span>::<span class='ident'>Failed</span>(
-                    <span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;Unable to fetch MX record: {:?}&quot;</span>, <span class='ident'>e</span>));
-                <span class='macro'>warn</span><span class='macro'>!</span>(<span class='string'>&quot;MX LOOKUP FAILED FOR {}&quot;</span>, <span class='ident'>recipient</span>.<span class='ident'>email_addr</span>);
-                <span class='kw'>continue</span>;
-            }
-            <span class='prelude-val'>Ok</span>(<span class='ident'>records</span>) <span class='op'>=&gt;</span> {
-                <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>mx_records</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>SocketAddr</span><span class='op'>&gt;</span> <span class='op'>=</span> <span class='ident'>Vec</span>::<span class='ident'>new</span>();
-                <span class='kw'>for</span> <span class='ident'>record</span> <span class='kw'>in</span> <span class='ident'>records</span> {
-                    <span class='kw'>match</span> (<span class='kw-2'>&amp;</span><span class='op'>*</span><span class='ident'>record</span>, <span class='number'>25_u16</span>).<span class='ident'>to_socket_addrs</span>() {
-                        <span class='prelude-val'>Err</span>(_) <span class='op'>=&gt;</span> {
-                            <span class='macro'>warn</span><span class='macro'>!</span>(<span class='string'>&quot;ToSocketAddr FAILED FOR {}: {}&quot;</span>,
-                                  <span class='ident'>recipient</span>.<span class='ident'>email_addr</span>,
-                                     <span class='kw-2'>&amp;</span><span class='op'>*</span><span class='ident'>record</span>);
-                            <span class='kw'>continue</span>; <span class='comment'>// MX record invalid?</span>
-                        },
-                        <span class='prelude-val'>Ok</span>(<span class='kw-2'>mut</span> <span class='ident'>iter</span>) <span class='op'>=&gt;</span> <span class='kw'>match</span> <span class='ident'>iter</span>.<span class='ident'>next</span>() {
-                            <span class='prelude-val'>Some</span>(<span class='ident'>sa</span>) <span class='op'>=&gt;</span> <span class='ident'>mx_records</span>.<span class='ident'>push</span>(<span class='ident'>sa</span>),
-                            <span class='prelude-val'>None</span> <span class='op'>=&gt;</span> <span class='kw'>continue</span>, <span class='comment'>// No MX records</span>
-                        }
-                    }
-                }
-                <span class='kw'>if</span> <span class='ident'>mx_records</span>.<span class='ident'>len</span>() <span class='op'>==</span> <span class='number'>0</span> {
-                    <span class='ident'>recipient</span>.<span class='ident'>result</span> <span class='op'>=</span> <span class='ident'>DeliveryResult</span>::<span class='ident'>Failed</span>(
-                        <span class='string'>&quot;MX records found but none are valid&quot;</span>.<span class='ident'>to_owned</span>());
-                    <span class='kw'>continue</span>;
-                }
-                <span class='ident'>mx_records</span>
-            }
-        };
-        <span class='ident'>recipient</span>.<span class='ident'>mx_servers</span> <span class='op'>=</span> <span class='prelude-val'>Some</span>(<span class='ident'>mx_records</span>);
-        <span class='macro'>debug</span><span class='macro'>!</span>(<span class='string'>&quot;DEBUG: got mx servers for {}: {:?}&quot;</span>,
-               <span class='ident'>recipient</span>.<span class='ident'>email_addr</span>,
-               <span class='ident'>recipient</span>.<span class='ident'>mx_servers</span>.<span class='ident'>as_ref</span>().<span class='ident'>unwrap</span>());
-    }
+<span class='kw'>struct</span> <span class='ident'>MxDelivery</span> {
+    <span class='ident'>mx_server</span>: <span class='ident'>SocketAddr</span>,
+    <span class='ident'>recipients</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>usize</span><span class='op'>&gt;</span> <span class='comment'>// index into InternalStatus.recipients</span>
 }
 
-<span class='comment'>// Get MX records for a domain, in order of preference</span>
-<span class='kw'>fn</span> <span class='ident'>get_mx_records_for_domain</span>(<span class='ident'>domain</span>: <span class='kw-2'>&amp;</span><span class='ident'>str</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>String</span><span class='op'>&gt;</span>, <span class='ident'>Error</span><span class='op'>&gt;</span>
+<span class='comment'>// Organize delivery for one-SMTP-delivery per MX server, and then use smtp_deliver()</span>
+<span class='comment'>// Returns true only if all recipient deliveries have been completed (rather than deferred)</span>
+<span class='kw'>fn</span> <span class='ident'>deliver</span>(<span class='ident'>email</span>: <span class='kw-2'>&amp;</span><span class='ident'>Email</span>, <span class='ident'>internal_status</span>: <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>InternalStatus</span>, <span class='ident'>config</span>: <span class='kw-2'>&amp;</span><span class='ident'>Config</span>) <span class='op'>-&gt;</span> <span class='ident'>bool</span>
 {
-    <span class='kw'>use</span> <span class='ident'>resolv</span>::{<span class='ident'>Resolver</span>, <span class='ident'>Class</span>, <span class='ident'>RecordType</span>};
-    <span class='kw'>use</span> <span class='ident'>resolv</span>::<span class='ident'>Record</span>;
-    <span class='kw'>use</span> <span class='ident'>resolv</span>::<span class='ident'>record</span>::<span class='ident'>MX</span>;
+    <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>deferred_some</span>: <span class='ident'>bool</span> <span class='op'>=</span> <span class='bool-val'>false</span>;
 
-    <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>resolver</span> <span class='op'>=</span> <span class='kw'>match</span> <span class='ident'>Resolver</span>::<span class='ident'>new</span>() {
-        <span class='prelude-val'>Some</span>(<span class='ident'>r</span>) <span class='op'>=&gt;</span> <span class='ident'>r</span>,
-        <span class='prelude-val'>None</span> <span class='op'>=&gt;</span> <span class='kw'>return</span> <span class='prelude-val'>Err</span>(<span class='ident'>Error</span>::<span class='ident'>DnsUnavailable</span>),
-    };
+    <span class='comment'>// We will sort our deliver plans by MX server. Currently they are sorted</span>
+    <span class='comment'>// by recipient.</span>
+    <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>mx_delivery</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>MxDelivery</span><span class='op'>&gt;</span> <span class='op'>=</span> <span class='ident'>Vec</span>::<span class='ident'>new</span>();
 
-    <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>response</span> <span class='op'>=</span> <span class='macro'>try</span><span class='macro'>!</span>(<span class='ident'>resolver</span>.<span class='ident'>query</span>(<span class='ident'>domain</span>.<span class='ident'>as_bytes</span>(),
-                                           <span class='ident'>Class</span>::<span class='ident'>IN</span>,
-                                           <span class='ident'>RecordType</span>::<span class='ident'>MX</span>));
+    <span class='kw'>for</span> <span class='ident'>r_index</span> <span class='kw'>in</span> <span class='number'>0</span>..<span class='ident'>internal_status</span>.<span class='ident'>recipients</span>.<span class='ident'>len</span>() {
 
-    <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>records</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>Record</span><span class='op'>&lt;</span><span class='ident'>MX</span><span class='op'>&gt;&gt;</span> <span class='op'>=</span> <span class='ident'>response</span>.<span class='ident'>answers</span>::<span class='op'>&lt;</span><span class='ident'>MX</span><span class='op'>&gt;</span>().<span class='ident'>collect</span>();
-    <span class='ident'>records</span>.<span class='ident'>sort_by</span>(<span class='op'>|</span><span class='ident'>a</span>,<span class='ident'>b</span><span class='op'>|</span> <span class='ident'>a</span>.<span class='ident'>data</span>.<span class='ident'>preference</span>.<span class='ident'>cmp</span>(<span class='kw-2'>&amp;</span><span class='ident'>b</span>.<span class='ident'>data</span>.<span class='ident'>preference</span>));
-    <span class='prelude-val'>Ok</span>(<span class='ident'>records</span>.<span class='ident'>into_iter</span>().<span class='ident'>map</span>(<span class='op'>|</span><span class='ident'>rmx</span><span class='op'>|</span> <span class='ident'>rmx</span>.<span class='ident'>data</span>.<span class='ident'>exchange</span>).<span class='ident'>collect</span>())
+        <span class='kw'>let</span> <span class='ident'>recip</span> <span class='op'>=</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>internal_status</span>.<span class='ident'>recipients</span>[<span class='ident'>r_index</span>];
+
+        <span class='comment'>// Skip this recipient if already completed</span>
+        <span class='kw'>match</span> <span class='ident'>recip</span>.<span class='ident'>result</span> {
+            <span class='ident'>DeliveryResult</span>::<span class='ident'>Delivered</span>(_) <span class='op'>=&gt;</span> <span class='kw'>continue</span>,
+            <span class='ident'>DeliveryResult</span>::<span class='ident'>Failed</span>(_) <span class='op'>=&gt;</span> <span class='kw'>continue</span>,
+            _ <span class='op'>=&gt;</span> {}
+        }
+
+        <span class='comment'>// If recipient was deferred too many times, fail them and skip them</span>
+        <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>data</span>: <span class='prelude-ty'>Option</span><span class='op'>&lt;</span>(<span class='ident'>u8</span>, <span class='ident'>String</span>)<span class='op'>&gt;</span> <span class='op'>=</span> <span class='prelude-val'>None</span>;
+        <span class='kw'>if</span> <span class='kw'>let</span> <span class='ident'>DeliveryResult</span>::<span class='ident'>Deferred</span>(<span class='ident'>a</span>, <span class='kw-2'>ref</span> <span class='ident'>msg</span>) <span class='op'>=</span> <span class='ident'>recip</span>.<span class='ident'>result</span> {
+            <span class='ident'>data</span> <span class='op'>=</span> <span class='prelude-val'>Some</span>((<span class='ident'>a</span>, <span class='ident'>msg</span>.<span class='ident'>clone</span>()));
+        };
+        <span class='kw'>if</span> <span class='ident'>data</span>.<span class='ident'>is_some</span>() {
+            <span class='kw'>let</span> (<span class='ident'>attempts</span>, <span class='ident'>msg</span>) <span class='op'>=</span> <span class='ident'>data</span>.<span class='ident'>unwrap</span>();
+            <span class='comment'>// We allow 5 attempts (even though worker does 3 passes, we might try</span>
+            <span class='comment'>// across multiple MX servers)</span>
+            <span class='kw'>if</span> <span class='ident'>attempts</span> <span class='op'>&gt;=</span> <span class='number'>5</span> {
+                <span class='macro'>debug</span><span class='macro'>!</span>(<span class='string'>&quot;(worker) delivery failed after 5 attempts.&quot;</span>);
+                <span class='ident'>recip</span>.<span class='ident'>result</span> <span class='op'>=</span> <span class='ident'>DeliveryResult</span>::<span class='ident'>Failed</span>(
+                    <span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;Failed after 5 attempts: {}&quot;</span>, <span class='ident'>msg</span>));
+                <span class='kw'>continue</span>;
+            }
+        }
+
+        <span class='comment'>// Skip (and complete) if no MX servers</span>
+        <span class='kw'>if</span> <span class='ident'>recip</span>.<span class='ident'>mx_servers</span>.<span class='ident'>is_none</span>() {
+            <span class='macro'>debug</span><span class='macro'>!</span>(<span class='string'>&quot;(worker) delivery failed (no valid MX records).&quot;</span>);
+            <span class='ident'>recip</span>.<span class='ident'>result</span> <span class='op'>=</span> <span class='ident'>DeliveryResult</span>::<span class='ident'>Failed</span>(
+                <span class='string'>&quot;MX records found but none are valid&quot;</span>.<span class='ident'>to_owned</span>());
+            <span class='kw'>continue</span>;
+        }
+
+        <span class='comment'>// Sequence through this recipients MX servers</span>
+        <span class='kw'>let</span> <span class='ident'>mx_servers</span>: <span class='kw-2'>&amp;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>SocketAddr</span><span class='op'>&gt;</span> <span class='op'>=</span> <span class='ident'>recip</span>.<span class='ident'>mx_servers</span>.<span class='ident'>as_ref</span>().<span class='ident'>unwrap</span>();
+
+        <span class='comment'>// Add to our MxDelivery vector</span>
+        <span class='kw'>for</span> <span class='ident'>i</span> <span class='kw'>in</span> <span class='ident'>recip</span>.<span class='ident'>current_mx</span> .. <span class='ident'>mx_servers</span>.<span class='ident'>len</span>() {
+            <span class='comment'>// Find the index of the MX server in our mx_delivery array</span>
+            <span class='kw'>let</span> <span class='ident'>maybe_position</span> <span class='op'>=</span> <span class='ident'>mx_delivery</span>.<span class='ident'>iter</span>().<span class='ident'>position</span>(
+                <span class='op'>|</span><span class='kw-2'>ref</span> <span class='ident'>mxd</span><span class='op'>|</span> <span class='ident'>mxd</span>.<span class='ident'>mx_server</span> <span class='op'>==</span> <span class='ident'>mx_servers</span>[<span class='ident'>i</span>]);
+            <span class='kw'>match</span> <span class='ident'>maybe_position</span> {
+                <span class='prelude-val'>None</span> <span class='op'>=&gt;</span> {
+                    <span class='comment'>// Add this new MX server with the current recipient</span>
+                    <span class='ident'>mx_delivery</span>.<span class='ident'>push</span>(<span class='ident'>MxDelivery</span> {
+                        <span class='ident'>mx_server</span>: <span class='ident'>mx_servers</span>[<span class='ident'>i</span>],
+                        <span class='ident'>recipients</span>: <span class='macro'>vec</span><span class='macro'>!</span>[ <span class='ident'>r_index</span> ],
+                    });
+                },
+                <span class='prelude-val'>Some</span>(<span class='ident'>index</span>) <span class='op'>=&gt;</span> {
+                    <span class='comment'>// Add this recipient to the mx_delivery</span>
+                    <span class='ident'>mx_delivery</span>[<span class='ident'>index</span>].<span class='ident'>recipients</span>.<span class='ident'>push</span>( <span class='ident'>r_index</span> );
+                },
+            }
+        }
+    }
+
+    <span class='comment'>// Deliver on a per-mx basis</span>
+    <span class='kw'>for</span> <span class='ident'>mxd</span> <span class='kw'>in</span> <span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='ident'>mx_delivery</span> {
+
+        <span class='kw'>let</span> <span class='ident'>envelope</span> <span class='op'>=</span> <span class='ident'>Envelope</span> {
+            <span class='ident'>message_id</span>: <span class='ident'>internal_status</span>.<span class='ident'>message_id</span>.<span class='ident'>clone</span>(),
+            <span class='ident'>to_addresses</span>: <span class='ident'>mxd</span>.<span class='ident'>recipients</span>.<span class='ident'>iter</span>()
+                .<span class='ident'>filter_map</span>(<span class='op'>|</span><span class='ident'>r</span><span class='op'>|</span> {
+                    <span class='kw'>if</span> <span class='ident'>internal_status</span>.<span class='ident'>recipients</span>[<span class='op'>*</span><span class='ident'>r</span>].<span class='ident'>result</span>.<span class='ident'>completed</span>() {
+                        <span class='prelude-val'>None</span>
+                    } <span class='kw'>else</span> {
+                        <span class='prelude-val'>Some</span>(<span class='ident'>internal_status</span>.<span class='ident'>recipients</span>[<span class='op'>*</span><span class='ident'>r</span>].<span class='ident'>smtp_email_addr</span>.<span class='ident'>clone</span>())
+                    }
+                })
+                .<span class='ident'>collect</span>(),
+            <span class='ident'>email</span>: <span class='kw-2'>&amp;</span><span class='ident'>email</span>
+        };
+
+        <span class='comment'>// Skip this MX server if no addresses to deliver to</span>
+        <span class='comment'>// (this can happen if a previous server already handled its recipients and</span>
+        <span class='comment'>// the filter_map above removed them all)</span>
+        <span class='kw'>if</span> <span class='ident'>envelope</span>.<span class='ident'>to_addresses</span>.<span class='ident'>len</span>() <span class='op'>==</span> <span class='number'>0</span> {
+            <span class='kw'>continue</span>;
+        }
+
+        <span class='comment'>// Actually deliver to this SMTP server</span>
+        <span class='comment'>// (we set attempt=1 but this gets replaced per recipient below)</span>
+        <span class='kw'>let</span> <span class='ident'>result</span> <span class='op'>=</span> ::<span class='ident'>worker</span>::<span class='ident'>smtp</span>::<span class='ident'>smtp_delivery</span>(
+            <span class='ident'>envelope</span>, <span class='kw-2'>&amp;</span><span class='ident'>mxd</span>.<span class='ident'>mx_server</span>, <span class='ident'>config</span>, <span class='number'>1</span>);
+
+        <span class='kw'>for</span> <span class='ident'>r</span> <span class='kw'>in</span> <span class='ident'>mxd</span>.<span class='ident'>recipients</span>.<span class='ident'>iter</span>() {
+
+            <span class='comment'>// If the result is deferred, and the previous result was deferred, then</span>
+            <span class='comment'>// bump the attempt number and update the reason message</span>
+            <span class='kw'>if</span> <span class='kw'>let</span> <span class='ident'>DeliveryResult</span>::<span class='ident'>Deferred</span>(_, <span class='kw-2'>ref</span> <span class='ident'>newmsg</span>) <span class='op'>=</span> <span class='ident'>result</span> {
+                <span class='ident'>deferred_some</span> <span class='op'>=</span> <span class='bool-val'>true</span>;
+                <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>data</span>: <span class='prelude-ty'>Option</span><span class='op'>&lt;</span><span class='ident'>u8</span><span class='op'>&gt;</span> <span class='op'>=</span> <span class='prelude-val'>None</span>;
+                <span class='kw'>if</span> <span class='kw'>let</span> <span class='ident'>DeliveryResult</span>::<span class='ident'>Deferred</span>(<span class='ident'>attempts</span>, _) <span class='op'>=</span> <span class='ident'>internal_status</span>.<span class='ident'>recipients</span>[<span class='op'>*</span><span class='ident'>r</span>].<span class='ident'>result</span>
+                {
+                    <span class='ident'>data</span> <span class='op'>=</span> <span class='prelude-val'>Some</span>(<span class='ident'>attempts</span>);
+                }
+                <span class='kw'>if</span> <span class='ident'>data</span>.<span class='ident'>is_some</span>() {
+                    <span class='kw'>let</span> <span class='ident'>attempts</span> <span class='op'>=</span> <span class='ident'>data</span>.<span class='ident'>unwrap</span>();
+                    <span class='ident'>internal_status</span>.<span class='ident'>recipients</span>[<span class='op'>*</span><span class='ident'>r</span>].<span class='ident'>result</span> <span class='op'>=</span> <span class='ident'>DeliveryResult</span>::<span class='ident'>Deferred</span>(
+                        <span class='ident'>attempts</span> <span class='op'>+</span> <span class='number'>1</span>, <span class='ident'>newmsg</span>.<span class='ident'>clone</span>());
+                    <span class='kw'>continue</span>;
+                }
+            }
+
+            <span class='comment'>// For everyone else, just take the result</span>
+            <span class='ident'>internal_status</span>.<span class='ident'>recipients</span>[<span class='op'>*</span><span class='ident'>r</span>].<span class='ident'>result</span> <span class='op'>=</span> <span class='ident'>result</span>.<span class='ident'>clone</span>();
+        }
+
+    }
+
+    <span class='op'>!</span><span class='ident'>deferred_some</span>
 }
 </pre>
 </section>

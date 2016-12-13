@@ -196,6 +196,15 @@
 <span id="152">152</span>
 <span id="153">153</span>
 <span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
 </pre><pre class='rust '>
 
 <span class='kw'>use</span> <span class='ident'>std</span>::<span class='ident'>net</span>::<span class='ident'>SocketAddr</span>;
@@ -209,8 +218,11 @@
 <span class='doccomment'>/// Information about the recipients of an email to be sent</span>
 <span class='attribute'>#[<span class='ident'>derive</span>(<span class='ident'>Debug</span>, <span class='ident'>Clone</span>, <span class='ident'>Serialize</span>, <span class='ident'>Deserialize</span>)]</span>
 <span class='kw'>pub</span> <span class='kw'>struct</span> <span class='ident'>Recipient</span> {
-    <span class='doccomment'>/// The recipient&#39;s email address</span>
+    <span class='doccomment'>/// The recipient&#39;s email address (for display)</span>
     <span class='kw'>pub</span> <span class='ident'>email_addr</span>: <span class='ident'>String</span>,
+
+    <span class='doccomment'>/// The recipient&#39;s email address (for SMTP)</span>
+    <span class='kw'>pub</span> <span class='ident'>smtp_email_addr</span>: <span class='ident'>String</span>,
 
     <span class='doccomment'>/// The domain parsed off of the recipients email address</span>
     <span class='kw'>pub</span> <span class='ident'>domain</span>: <span class='ident'>String</span>,
@@ -238,10 +250,13 @@
     <span class='doccomment'>/// (MX record lookups take some time).</span>
     <span class='kw'>pub</span> <span class='ident'>recipients</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>Recipient</span><span class='op'>&gt;</span>,
 
-    <span class='doccomment'>/// The MX servers which we have successfully delivered to.  We keep</span>
-    <span class='doccomment'>/// this as a separate list so we can more easily detect the situation</span>
-    <span class='doccomment'>/// where multiple recipients deliveries go to the same MX</span>
-    <span class='kw'>pub</span> <span class='ident'>delivered_to_mx</span>: <span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>SocketAddr</span><span class='op'>&gt;</span>,
+    <span class='doccomment'>/// Attempts remaining. This counts backwards to zero. If all deliveries are</span>
+    <span class='doccomment'>/// complete (permanent success or failure), it is set to zero.</span>
+    <span class='doccomment'>///</span>
+    <span class='doccomment'>/// Per-recipient deferred attempt numbers count upwards, and may get more</span>
+    <span class='doccomment'>/// attempts because a single worker pass may try a recipient on muliple MX</span>
+    <span class='doccomment'>/// servers.</span>
+    <span class='kw'>pub</span> <span class='ident'>attempts_remaining</span>: <span class='ident'>u8</span>,
 }
 
 <span class='kw'>impl</span> <span class='ident'>InternalStatus</span>
@@ -271,7 +286,7 @@
         <span class='prelude-val'>Ok</span>((<span class='ident'>InternalStatus</span> {
             <span class='ident'>message_id</span>: <span class='ident'>message_id</span>,
             <span class='ident'>recipients</span>: <span class='ident'>recipients</span>,
-            <span class='ident'>delivered_to_mx</span>: <span class='ident'>Vec</span>::<span class='ident'>new</span>(),
+            <span class='ident'>attempts_remaining</span>: <span class='number'>3</span>,
         }, <span class='ident'>email</span>))
     }
 
@@ -336,16 +351,19 @@
 
 <span class='kw'>fn</span> <span class='ident'>recipient_from_mailbox</span>(<span class='ident'>mb</span>: <span class='ident'>Mailbox</span>) <span class='op'>-&gt;</span> <span class='ident'>Recipient</span>
 {
-    <span class='kw'>let</span> (<span class='ident'>email_addr</span>, <span class='ident'>domain</span>) <span class='op'>=</span> <span class='kw'>match</span> <span class='ident'>mb</span> {
+    <span class='kw'>let</span> (<span class='ident'>email_addr</span>, <span class='ident'>smtp_email_addr</span>, <span class='ident'>domain</span>) <span class='op'>=</span> <span class='kw'>match</span> <span class='ident'>mb</span> {
         <span class='ident'>Mailbox</span>::<span class='ident'>NameAddr</span>(<span class='ident'>na</span>) <span class='op'>=&gt;</span> (<span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;{}&quot;</span>, <span class='ident'>na</span>),
+                                  <span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;{}&quot;</span>, <span class='ident'>na</span>.<span class='ident'>angle_addr</span>.<span class='ident'>addr_spec</span>),
                                   <span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;{}&quot;</span>, <span class='ident'>na</span>.<span class='ident'>angle_addr</span>.<span class='ident'>addr_spec</span>.<span class='ident'>domain</span>)),
         <span class='ident'>Mailbox</span>::<span class='ident'>AddrSpec</span>(<span class='ident'>ads</span>) <span class='op'>=&gt;</span> (<span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;{}&quot;</span>, <span class='ident'>ads</span>),
+                                   <span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;{}&quot;</span>, <span class='ident'>ads</span>),
                                    <span class='macro'>format</span><span class='macro'>!</span>(<span class='string'>&quot;{}&quot;</span>, <span class='ident'>ads</span>.<span class='ident'>domain</span>)),
     };
 
     <span class='ident'>Recipient</span> {
-        <span class='ident'>email_addr</span>: <span class='ident'>email_addr</span>,
-        <span class='ident'>domain</span>: <span class='ident'>domain</span>,
+        <span class='ident'>email_addr</span>: <span class='ident'>email_addr</span>.<span class='ident'>trim</span>().<span class='ident'>to_owned</span>(),
+        <span class='ident'>smtp_email_addr</span>: <span class='ident'>smtp_email_addr</span>.<span class='ident'>trim</span>().<span class='ident'>to_owned</span>(),
+        <span class='ident'>domain</span>: <span class='ident'>domain</span>.<span class='ident'>trim</span>().<span class='ident'>to_owned</span>(),
         <span class='ident'>mx_servers</span>: <span class='prelude-val'>None</span>, <span class='comment'>// To be determined later by a worker task</span>
         <span class='ident'>current_mx</span>: <span class='number'>0</span>,
         <span class='ident'>result</span>: <span class='ident'>DeliveryResult</span>::<span class='ident'>Queued</span>,

@@ -69,6 +69,16 @@
 <span id="25">25</span>
 <span id="26">26</span>
 <span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
 </pre><pre class='rust '>
 
 <span class='kw'>pub</span> <span class='kw'>mod</span> <span class='ident'>memory_storage</span>;
@@ -84,11 +94,11 @@
     <span class='kw'>type</span> <span class='ident'>Error</span>: <span class='ident'>MailstromStorageError</span>;
 
     <span class='doccomment'>/// Store an `Email`.  This should overwrite if message-id matches an existing email.</span>
-    <span class='kw'>fn</span> <span class='ident'>store</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>, <span class='ident'>email</span>: <span class='kw-2'>&amp;</span><span class='ident'>Email</span>, <span class='ident'>internal_status</span>: <span class='kw-2'>&amp;</span><span class='ident'>InternalStatus</span>)
+    <span class='kw'>fn</span> <span class='ident'>store</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>, <span class='ident'>email</span>: <span class='ident'>Email</span>, <span class='ident'>internal_status</span>: <span class='ident'>InternalStatus</span>)
              <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span>(), <span class='self'>Self</span>::<span class='ident'>Error</span><span class='op'>&gt;</span>;
 
     <span class='doccomment'>/// Update the status of an email</span>
-    <span class='kw'>fn</span> <span class='ident'>update_status</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>, <span class='ident'>internal_status</span>: <span class='kw-2'>&amp;</span><span class='ident'>InternalStatus</span>)
+    <span class='kw'>fn</span> <span class='ident'>update_status</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>, <span class='ident'>internal_status</span>: <span class='ident'>InternalStatus</span>)
              <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span>(), <span class='self'>Self</span>::<span class='ident'>Error</span><span class='op'>&gt;</span>;
 
     <span class='doccomment'>/// Retrieve an `Email` and `InternalStatus` based on the message_id</span>
@@ -96,6 +106,16 @@
 
     <span class='doccomment'>/// Retrieve an `InternalStatus` based on the message_id</span>
     <span class='kw'>fn</span> <span class='ident'>retrieve_status</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>, <span class='ident'>message_id</span>: <span class='kw-2'>&amp;</span><span class='ident'>str</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>InternalStatus</span>, <span class='self'>Self</span>::<span class='ident'>Error</span><span class='op'>&gt;</span>;
+
+    <span class='doccomment'>/// Retrieve all incomplete emails (status only). This is used to continue retrying</span>
+    <span class='doccomment'>/// after shutdown and later startup.</span>
+    <span class='kw'>fn</span> <span class='ident'>retrieve_all_incomplete</span>(<span class='kw-2'>&amp;</span><span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>InternalStatus</span><span class='op'>&gt;</span>, <span class='self'>Self</span>::<span class='ident'>Error</span><span class='op'>&gt;</span>;
+
+    <span class='doccomment'>/// Retrieve all incomplete emails as well as all complete emails that have become</span>
+    <span class='doccomment'>/// complete since the last time this function was called. This can be implemented</span>
+    <span class='doccomment'>/// by storing a retrieved boolean as falswe when update_status saves as complete,</span>
+    <span class='doccomment'>/// and setting that boolean to true when this function is run.</span>
+    <span class='kw'>fn</span> <span class='ident'>retrieve_all_recent</span>(<span class='kw-2'>&amp;</span><span class='kw-2'>mut</span> <span class='self'>self</span>) <span class='op'>-&gt;</span> <span class='prelude-ty'>Result</span><span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span><span class='ident'>InternalStatus</span><span class='op'>&gt;</span>, <span class='self'>Self</span>::<span class='ident'>Error</span><span class='op'>&gt;</span>;
 }
 </pre>
 </section>

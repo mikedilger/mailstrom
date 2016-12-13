@@ -47,8 +47,39 @@
                    <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
                        [<span class='inner'>&#x2212;</span>]
                    </a>
-               </span><a class='srclink' href='../src/mailstrom/lib.rs.html#1-173' title='goto source code'>[src]</a></span></h1>
-<div class='docblock'><p>Mailstrom handles email delivery.</p>
+               </span><a class='srclink' href='../src/mailstrom/lib.rs.html#1-243' title='goto source code'>[src]</a></span></h1>
+<div class='docblock'><p>Mailstrom handles email delivery in a background worker thread, with the following
+features:</p>
+
+<ul>
+<li>Accepts an email from the caller and then does everything necessary to get it
+delivered to all recipients without blocking the caller.</li>
+<li>Allows the caller to query the status of an earlier submitted email at any time,
+to determine if it is Queued, Delivered, Deferred, or has Failed, with details
+as to why, on a per-recipient basis.</li>
+<li>Handles all parsing, validation, and encoding of email content and headers,
+in compliance with RFC 5322 (and other RFCs).  Uses the
+<a href="https://github.com/mikedilger/email-format">email-format</a> library for this.</li>
+<li>Looks up the DNS MX records of the recipients, and delivers directly to those Internet
+mail servers over SMTP, thus not requiring any local SMTP relay.  Uses the
+<a href="https://github.com/mikedilger/resolv-rs">resolv</a> library for DNS lookups (via your
+operating system)</li>
+<li>SMTP transport &quot;heavy lifting&quot; is performed via the <a href="https://github.com/lettre/lettre">lettre</a>
+library.  Uses STARTTLS where available.</li>
+<li>Retries with exponential backoff for a fixed number of retries (currently fixed at 3),
+when the send result is Deferred</li>
+<li>Uses a pluggable user-defined state management (persistence) layer.</li>
+</ul>
+
+<h2 id='limitations' class='section-header'><a href='#limitations'>Limitations</a></h2>
+<ul>
+<li>Only works on glibc based operating systems, due to usage of the <code>resolv</code> library.</li>
+<li>The <a href="https://github.com/mikedilger/email-format">email-format</a> crate is somewhat incomplete
+and clunky still.  It doesn&#39;t incorporate RFC 6854 (updated From and Sender syntax) yet.
+It defines types one-to-one with ABNF parsing units, rather than as semantic units of meaning.
+And it doesn&#39;t let you use obvious types yet like setting the date from a DateTime type.
+However, these issues will be worked out in the near future.</li>
+</ul>
 
 <p>You can use it as follows:</p>
 
@@ -79,8 +110,14 @@
     <span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>mailstrom</span> <span class='op'>=</span> <span class='ident'>Mailstrom</span>::<span class='ident'>new</span>(
         <span class='ident'>Config</span> {
             <span class='ident'>helo_name</span>: <span class='string'>&quot;my.host.domainname&quot;</span>.<span class='ident'>to_owned</span>(),
+            <span class='ident'>smtp_timeout_secs</span>: <span class='number'>30</span>,
         },
         <span class='ident'>MemoryStorage</span>::<span class='ident'>new</span>());
+
+    <span class='comment'>// We must explicitly tell mailstrom to start actually sending emails.  If we</span>
+    <span class='comment'>// were only interested in reading the status of previously sent emails, we</span>
+    <span class='comment'>// would not send this command.</span>
+    <span class='ident'>mailstrom</span>.<span class='ident'>start</span>().<span class='ident'>unwrap</span>();
 
     <span class='kw'>let</span> <span class='ident'>message_id</span> <span class='op'>=</span> <span class='ident'>mailstrom</span>.<span class='ident'>send_email</span>(<span class='ident'>email</span>).<span class='ident'>unwrap</span>();
 
