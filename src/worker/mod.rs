@@ -19,8 +19,9 @@ use self::smtp::Envelope;
 use ::Config;
 
 pub enum Message {
-    /// Ask the worker to deliver an email
-    SendEmail(Email, InternalStatus),
+    /// Ask the worker to deliver an email (message_id is provided, Mailstrom will have
+    /// already stored it)
+    SendEmail(String),
     /// Ask the worker to terminate
     Terminate,
 }
@@ -110,7 +111,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
         loop {
             // Compute the timeout
             // This timeout represents how long we wait for a message.  If there are any
-            // tasks in the tasklist, this will be the tiem until the first task is
+            // tasks in the tasklist, this will be the time until the first task is
             // due.  Otherwise it is set to 60 seconds.
             let now = Instant::now();
             let timeout: Duration = if let Some(task) = self.tasks.iter().next() {
@@ -131,15 +132,15 @@ impl<S: MailstromStorage + 'static> Worker<S>
             // is due, or 60 seconds if there are no tasks
             match self.receiver.recv_timeout(timeout) {
                 Ok(message) => match message {
-                    Message::SendEmail(email, internal_status) => {
+                    Message::SendEmail(message_id) => {
                         debug!("(worker) received SendEmail command");
-                        let worker_status = self.send_email(email, internal_status, true);
-                        if worker_status != WorkerStatus::Ok {
-                            self.worker_status.store(worker_status as u8,
-                                                     Ordering::SeqCst);
-                            info!("(worker) failed and terminated");
-                            return;
-                        }
+                        // Create a task (don't do it right away) so we can more easily
+                        // code pause-continue logic and eventually multiple worker threads
+                        self.tasks.insert( Task {
+                            tasktype: TaskType::Resend,
+                            time: Instant::now(),
+                            message_id: message_id,
+                        });
                     }
                     Message::Terminate => {
                         debug!("(worker) received Terminate command");

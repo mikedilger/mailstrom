@@ -185,7 +185,7 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
             try!((*guard).store(&email, &internal_status));
         }
 
-        try!(self.sender.send(Message::SendEmail(email, internal_status)));
+        try!(self.sender.send(Message::SendEmail(message_id.clone())));
 
         info!("Passed email {} off to worker", &*message_id);
 
