@@ -59,7 +59,7 @@ impl MailstromStorage for MemoryStorage {
         Ok(())
     }
 
-    fn update_status(&mut self, internal_status: &InternalStatus)
+    fn update_status(&mut self, internal_status: InternalStatus)
                      -> Result<(), MemoryStorageError>
     {
         let record: &mut Record = match self.0.get_mut(&internal_status.message_id) {
@@ -67,7 +67,7 @@ impl MailstromStorage for MemoryStorage {
             Some(record) => record,
         };
 
-        record.status = internal_status.clone();
+        record.status = internal_status;
         Ok(())
     }
 

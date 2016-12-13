@@ -249,7 +249,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
             },
         };
 
-        if let Err(e) = (*guard).update_status(internal_status) {
+        if let Err(e) = (*guard).update_status(internal_status.clone()) {
             error!("{:?}", e);
             return WorkerStatus::StorageWriteFailed;
         }

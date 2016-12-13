@@ -16,7 +16,7 @@ pub trait MailstromStorage: Send + Sync {
              -> Result<(), Self::Error>;
 
     /// Update the status of an email
-    fn update_status(&mut self, internal_status: &InternalStatus)
+    fn update_status(&mut self, internal_status: InternalStatus)
              -> Result<(), Self::Error>;
 
     /// Retrieve an `Email` and `InternalStatus` based on the message_id
