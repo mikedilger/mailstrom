@@ -28,4 +28,10 @@ pub trait MailstromStorage: Send + Sync {
     /// Retrieve all incomplete emails (status only). This is used to continue retrying
     /// after shutdown and later startup.
     fn retrieve_all_incomplete(&self) -> Result<Vec<InternalStatus>, Self::Error>;
+
+    /// Retrieve all incomplete emails as well as all complete emails that have become
+    /// complete since the last time this function was called. This can be implemented
+    /// by storing a retrieved boolean as falswe when update_status saves as complete,
+    /// and setting that boolean to true when this function is run.
+    fn retrieve_all_recent(&mut self) -> Result<Vec<InternalStatus>, Self::Error>;
 }
