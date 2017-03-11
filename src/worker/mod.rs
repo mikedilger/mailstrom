@@ -379,9 +379,10 @@ fn deliver(email: &Email, internal_status: &mut InternalStatus, config: &Config)
     // Deliver on a per-mx basis
     for mxd in &mut mx_delivery {
 
-        let envelope = Envelope {
-            message_id: internal_status.message_id.clone(),
-            to_addresses: mxd.recipients.iter()
+        let envelope = Envelope::new(
+            &email,
+            internal_status.message_id.clone(),
+            mxd.recipients.iter()
                 .filter_map(|r| {
                     if internal_status.recipients[*r].result.completed() {
                         None
@@ -389,14 +390,12 @@ fn deliver(email: &Email, internal_status: &mut InternalStatus, config: &Config)
                         Some(internal_status.recipients[*r].smtp_email_addr.clone())
                     }
                 })
-                .collect(),
-            email: &email
-        };
+                .collect());
 
         // Skip this MX server if no addresses to deliver to
         // (this can happen if a previous server already handled its recipients and
         // the filter_map above removed them all)
-        if envelope.to_addresses.len() == 0 {
+        if envelope.lettre_envelope.to.len() == 0 {
             continue;
         }
 

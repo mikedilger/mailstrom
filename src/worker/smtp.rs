@@ -4,22 +4,24 @@ use lettre::transport::smtp::{SmtpTransportBuilder, SecurityLevel};
 use lettre::transport::smtp::response::Severity;
 use lettre::transport::smtp::error::Error as LettreSmtpError;
 use lettre::transport::EmailTransport;
+use lettre::email::Envelope as LettreEnvelope;
+use lettre::email::SendableEmail;
 use status::DeliveryResult;
 use email_format::Email;
 use email_format::rfc5322::types::Mailbox;
 use ::Config;
 
-// Implement lettre's SendableEmail
-
 pub struct Envelope<'a> {
     pub message_id: String,
-    pub to_addresses: Vec<String>,
+    pub lettre_envelope: LettreEnvelope,
     pub email: &'a Email,
 }
 
-impl<'a> ::lettre::email::SendableEmail for Envelope<'a> {
-    fn from_address(&self) -> String {
-        match self.email.get_sender() {
+impl<'a> Envelope<'a> {
+    pub fn new(email: &'a Email, message_id: String, to_addresses: Vec<String>)
+               -> Envelope<'a>
+    {
+        let f = match email.get_sender() {
             // Use sender if available
             Some(sender) => match sender.0 {
                 Mailbox::NameAddr(ref na) =>
@@ -27,22 +29,34 @@ impl<'a> ::lettre::email::SendableEmail for Envelope<'a> {
                 Mailbox::AddrSpec(ref aspec) =>
                     format!("{}", aspec).trim().to_owned(),
             },
-            None => match (self.email.get_from().0).0[0] {
+            None => match (email.get_from().0).0[0] {
                 Mailbox::NameAddr(ref na) =>
                     format!("{}", na.angle_addr.addr_spec).trim().to_owned(),
                 Mailbox::AddrSpec(ref aspec) =>
                     format!("{}", aspec).trim().to_owned(),
             },
+        };
+
+        Envelope {
+            message_id: message_id,
+            lettre_envelope: LettreEnvelope {
+                to: to_addresses,
+                from: f,
+            },
+            email: email
         }
     }
-    fn to_addresses(&self) -> Vec<String> {
-        self.to_addresses.clone()
-    }
-    fn message(self) -> String {
-        format!("{}", self.email)
+}
+
+impl<'a> SendableEmail for Envelope<'a> {
+    fn envelope(&self) -> &LettreEnvelope {
+        &self.lettre_envelope
     }
     fn message_id(&self) -> String {
         format!("{}", self.message_id)
+    }
+    fn message(self) -> String {
+        format!("{}", self.email)
     }
 }
 
@@ -52,7 +66,7 @@ pub fn smtp_delivery<'a>(envelope: Envelope<'a>,
                          -> DeliveryResult
 {
     trace!("SMTP delivery to [{}] at {}",
-           envelope.to_addresses.join(","),
+           envelope.lettre_envelope.to.join(","),
            smtp_server);
 
     let mailer = match SmtpTransportBuilder::new( smtp_server ) {
