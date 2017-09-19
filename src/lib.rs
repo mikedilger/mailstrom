@@ -78,7 +78,6 @@
 
 
 #![feature(integer_atomics)]
-#![feature(proc_macro)]
 
 extern crate uuid;
 extern crate email_format;
