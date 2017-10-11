@@ -51,20 +51,19 @@ pub fn get_mx_records_for_email(internal_status: &mut InternalStatus)
 // Get MX records for a domain, in order of preference
 fn get_mx_records_for_domain(domain: &str) -> Result<Vec<String>, Error>
 {
-    use resolv::{Resolver, Class, RecordType};
-    use resolv::Record;
-    use resolv::record::MX;
+    use trust_dns_resolver::Resolver;
+    use trust_dns_resolver::config::*;
 
-    let mut resolver = match Resolver::new() {
-        Some(r) => r,
-        None => return Err(Error::DnsUnavailable),
-    };
+    // FIXME:  make resolver global, so we don't keep recreating it.
+    let resolver = Resolver::new(
+        ResolverConfig::default(),
+        ResolverOpts::default())?;
 
-    let mut response = try!(resolver.query(domain.as_bytes(),
-                                           Class::IN,
-                                           RecordType::MX));
+    let response = resolver.mx_lookup(domain)?;
 
-    let mut records: Vec<Record<MX>> = response.answers::<MX>().collect();
-    records.sort_by(|a,b| a.data.preference.cmp(&b.data.preference));
-    Ok(records.into_iter().map(|rmx| rmx.data.exchange).collect())
+    let mut records: Vec<(u16,String)> = response.iter()
+        .map(|mx| (mx.preference(), mx.exchange().to_string()))
+        .collect();
+    records.sort_by(|a,b| a.0.cmp(&b.0));
+    Ok( records.into_iter().map(|(_,exch)| exch).collect() )
 }

@@ -1,10 +1,10 @@
 
 use std::convert::From;
 use std::sync::mpsc::SendError;
+use std::io::Error as IoError;
 use email_format::rfc5322::ParseError;
 use worker::Message;
 use storage::MailstromStorageError;
-use resolv::error::Error as ResolvError;
 
 #[derive(Debug)]
 pub enum Error {
@@ -12,8 +12,8 @@ pub enum Error {
     EmailParser(ParseError),
     Storage(String),
     DnsUnavailable,
-    Resolver(ResolvError),
     Lock,
+    Io(IoError),
 }
 
 impl From<SendError<Message>> for Error {
@@ -37,10 +37,10 @@ impl<S: MailstromStorageError> From<S> for Error {
     }
 }
 
-impl From<ResolvError> for Error {
-    fn from(e: ResolvError) -> Error
+impl From<IoError> for Error {
+    fn from(e: IoError) -> Error
     {
-        Error::Resolver(e)
+        Error::Io(e)
     }
 }
 
@@ -55,8 +55,6 @@ impl ::std::fmt::Display for Error {
                 format!("{}: {:?}", self.description(), e).fmt(f),
             Error::Storage(ref s) =>
                 format!("{}: {}", self.description(), s).fmt(f),
-            Error::Resolver(ref e) =>
-                format!("{}: {:?}", self.description(), e).fmt(f),
             _ => format!("{}", self.description()).fmt(f),
         }
     }
@@ -70,8 +68,8 @@ impl ::std::error::Error for Error {
             Error::EmailParser(_) => "Email does not parse",
             Error::Storage(_) => "Could not store or retrieve email state data",
             Error::DnsUnavailable => "DNS unavailable",
-            Error::Resolver(_) => "DNS error",
             Error::Lock => "Lock poisoned",
+            Error::Io(_) => "I/O error",
         }
     }
 
@@ -80,7 +78,7 @@ impl ::std::error::Error for Error {
         match *self {
             Error::Send(ref e) => Some(e),
             Error::EmailParser(ref e) => Some(e),
-            Error::Resolver(ref e) => Some(e),
+            Error::Io(ref e) => Some(e),
             _ => None,
         }
     }

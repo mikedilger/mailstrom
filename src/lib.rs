@@ -11,8 +11,7 @@
 //!   [email-format](https://github.com/mikedilger/email-format) library for this.
 //! * Looks up the DNS MX records of the recipients, and delivers directly to those Internet
 //!   mail servers over SMTP, thus not requiring any local SMTP relay.  Uses the
-//!   [resolv](https://github.com/mikedilger/resolv-rs) library for DNS lookups (via your
-//!   operating system)
+//!   [trust-dns](https://github.com/bluejekyll/trust-dns) library for DNS lookups
 //! * SMTP transport "heavy lifting" is performed via the [lettre](https://github.com/lettre/lettre)
 //!   library.  Uses STARTTLS where available.
 //! * Retries with exponential backoff for a fixed number of retries (currently fixed at 3),
@@ -21,7 +20,6 @@
 //!
 //! ## Limitations
 //!
-//! * Only works on glibc based operating systems, due to usage of the `resolv` library.
 //! * The [email-format](https://github.com/mikedilger/email-format) crate is somewhat incomplete
 //!   and clunky still.  It doesn't incorporate RFC 6854 (updated From and Sender syntax) yet.
 //!   It defines types one-to-one with ABNF parsing units, rather than as semantic units of meaning.
@@ -81,7 +79,7 @@
 
 extern crate uuid;
 extern crate email_format;
-extern crate resolv;
+extern crate trust_dns_resolver;
 extern crate lettre;
 #[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;

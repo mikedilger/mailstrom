@@ -18,8 +18,7 @@ background worker thread.  It does the following:
    [email-format](https://github.com/mikedilger/email-format) library for this.
  * Looks up the DNS MX records of the recipients, and delivers directly to those Internet
    mail servers over SMTP, thus not requiring any local SMTP relay.  Uses the
-   [resolv](https://github.com/mikedilger/resolv-rs) library for DNS lookups (via your
-   operating system)
+   [trust-dns](https://github.com/bluejekyll/trust-dns) library for DNS lookups
  * SMTP transport "heavy lifting" is performed via the [lettre](https://github.com/lettre/lettre)
    library.  Uses STARTTLS where available.
  * Retries with exponential backoff for a fixed number of retries (currently fixed at 3),
