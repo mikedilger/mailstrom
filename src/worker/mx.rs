@@ -1,16 +1,18 @@
 
+use trust_dns_resolver::Resolver;
 use internal_status::InternalStatus;
 use status::DeliveryResult;
 use error::Error;
 
 // Get MX records for email recipients
-pub fn get_mx_records_for_email(internal_status: &mut InternalStatus)
+pub fn get_mx_records_for_email(internal_status: &mut InternalStatus,
+                                resolver: &Resolver)
 {
     use std::net::{SocketAddr, ToSocketAddrs};
 
     // Look-up the MX records for each recipient
     for recipient in &mut internal_status.recipients {
-        let mx_records = match get_mx_records_for_domain(&*recipient.domain) {
+        let mx_records = match get_mx_records_for_domain(&*recipient.domain, resolver) {
             Err(e) => {
                 recipient.result = DeliveryResult::Failed(
                     format!("Unable to fetch MX record: {:?}", e));
@@ -49,16 +51,9 @@ pub fn get_mx_records_for_email(internal_status: &mut InternalStatus)
 }
 
 // Get MX records for a domain, in order of preference
-fn get_mx_records_for_domain(domain: &str) -> Result<Vec<String>, Error>
+fn get_mx_records_for_domain(domain: &str, resolver: &Resolver)
+                             -> Result<Vec<String>, Error>
 {
-    use trust_dns_resolver::Resolver;
-    use trust_dns_resolver::config::*;
-
-    // FIXME:  make resolver global, so we don't keep recreating it.
-    let resolver = Resolver::new(
-        ResolverConfig::default(),
-        ResolverOpts::default())?;
-
     let response = resolver.mx_lookup(domain)?;
 
     let mut records: Vec<(u16,String)> = response.iter()

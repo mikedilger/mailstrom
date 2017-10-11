@@ -10,6 +10,9 @@ use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 use std::net::SocketAddr;
 
+use trust_dns_resolver::Resolver;
+use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
+
 use email_format::Email;
 use internal_status::InternalStatus;
 use status::DeliveryResult;
@@ -39,6 +42,7 @@ pub enum WorkerStatus {
     LockPoisoned = 3,
     StorageWriteFailed = 4,
     StorageReadFailed = 5,
+    ResolverCreationFailed = 6,
     Unknown = 255,
 }
 impl WorkerStatus {
@@ -49,6 +53,8 @@ impl WorkerStatus {
             2 => WorkerStatus::ChannelDisconnected,
             3 => WorkerStatus::LockPoisoned,
             4 => WorkerStatus::StorageWriteFailed,
+            5 => WorkerStatus::StorageReadFailed,
+            6 => WorkerStatus::ResolverCreationFailed,
             _ => WorkerStatus::Unknown,
         }
     }
@@ -68,7 +74,7 @@ pub struct Worker<S: MailstromStorage + 'static>
     // A list of tasks we need to do later, sorted in time order
     tasks: BTreeSet<Task>,
 
-    paused: bool
+    paused: bool,
 }
 
 impl<S: MailstromStorage + 'static> Worker<S>
@@ -112,6 +118,18 @@ impl<S: MailstromStorage + 'static> Worker<S>
     }
 
     pub fn run(&mut self) {
+
+        let resolver: Resolver = match Resolver::new( ResolverConfig::default(),
+                                                      ResolverOpts::default() )
+        {
+            Ok(resolver) => resolver,
+            Err(e) => {
+                self.worker_status.store(WorkerStatus::ResolverCreationFailed as u8,
+                                         Ordering::SeqCst);
+                info!("(worker) failed and terminated: {:?}", e);
+                return;
+            }
+        };
 
         loop {
             // Compute the timeout
@@ -179,7 +197,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
 
                 // Handle all these due tasks
                 for task in &due_tasks {
-                    let worker_status = self.handle_task(task);
+                    let worker_status = self.handle_task(task, &resolver);
                     if worker_status != WorkerStatus::Ok {
                         self.worker_status.store(worker_status as u8,
                                                  Ordering::SeqCst);
@@ -192,7 +210,8 @@ impl<S: MailstromStorage + 'static> Worker<S>
         }
     }
 
-    fn send_email(&mut self, email: Email, mut internal_status: InternalStatus)
+    fn send_email(&mut self, email: Email, mut internal_status: InternalStatus,
+                  resolver: &Resolver)
                   -> WorkerStatus
     {
         let mut need_mx: bool = false;
@@ -204,7 +223,8 @@ impl<S: MailstromStorage + 'static> Worker<S>
         }
 
         if need_mx {
-            ::worker::mx::get_mx_records_for_email(&mut internal_status);
+            ::worker::mx::get_mx_records_for_email(&mut internal_status,
+                                                   &resolver);
 
             // Update storage with this MX information
             let status = self.update_status(&internal_status);
@@ -278,7 +298,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
         WorkerStatus::Ok
     }
 
-    fn handle_task(&mut self, task: &Task) -> WorkerStatus {
+    fn handle_task(&mut self, task: &Task, resolver: &Resolver) -> WorkerStatus {
         match task.tasktype {
             TaskType::Resend => {
                 debug!("(worker) resending a deferred email");
@@ -295,7 +315,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
                         Ok(x) => x
                     }
                 };
-                return self.send_email(email, internal_status);
+                return self.send_email(email, internal_status, resolver);
             },
         }
     }
