@@ -85,6 +85,7 @@ extern crate trust_dns_resolver;
 extern crate lettre;
 #[macro_use] extern crate log;
 #[macro_use] extern crate serde_derive;
+extern crate native_tls;
 
 #[cfg(test)]
 mod tests;

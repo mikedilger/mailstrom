@@ -20,3 +20,4 @@ lettre = { git = "https://github.com/lettre/lettre", rev="4f41eef9362fa8fdb31d01
 log = "0.3"
 serde = "1.0"
 serde_derive = "1.0"
+native-tls = "0.1"
