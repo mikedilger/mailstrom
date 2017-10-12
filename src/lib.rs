@@ -87,6 +87,9 @@ extern crate lettre;
 #[cfg(test)]
 mod tests;
 
+mod config;
+pub use config::Config;
+
 mod worker;
 pub use worker::WorkerStatus;
 
@@ -112,13 +115,6 @@ use worker::{Worker, Message};
 use error::Error;
 use internal_status::InternalStatus;
 pub use storage::{MailstromStorage, MailstromStorageError, MemoryStorage};
-
-#[derive(Debug, Clone)]
-pub struct Config
-{
-    pub helo_name: String,
-    pub smtp_timeout_secs: u64,
-}
 
 pub struct Mailstrom<S: MailstromStorage + 'static>
 {

@@ -11,7 +11,6 @@ use std::time::{Duration, Instant};
 use std::net::SocketAddr;
 
 use trust_dns_resolver::Resolver;
-use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
 
 use email_format::Email;
 use internal_status::InternalStatus;
@@ -119,8 +118,9 @@ impl<S: MailstromStorage + 'static> Worker<S>
 
     pub fn run(&mut self) {
 
-        let resolver: Resolver = match Resolver::new( ResolverConfig::default(),
-                                                      ResolverOpts::default() )
+        let resolver: Resolver = match Resolver::new(
+            self.config.resolver_config.clone(),
+            self.config.resolver_opts.clone())
         {
             Ok(resolver) => resolver,
             Err(e) => {
