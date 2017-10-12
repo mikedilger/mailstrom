@@ -2,7 +2,6 @@
 use trust_dns_resolver::Resolver;
 use internal_status::InternalStatus;
 use status::DeliveryResult;
-use error::Error;
 
 // Get MX records for email recipients
 pub fn get_mx_records_for_email(internal_status: &mut InternalStatus,
@@ -12,38 +11,29 @@ pub fn get_mx_records_for_email(internal_status: &mut InternalStatus,
 
     // Look-up the MX records for each recipient
     for recipient in &mut internal_status.recipients {
-        let mx_records = match get_mx_records_for_domain(&*recipient.domain, resolver) {
-            Err(e) => {
-                recipient.result = DeliveryResult::Failed(
-                    format!("Unable to fetch MX record: {:?}", e));
-                warn!("MX LOOKUP FAILED FOR {}", recipient.email_addr);
-                continue;
-            }
-            Ok(records) => {
-                let mut mx_records: Vec<SocketAddr> = Vec::new();
-                for record in records {
-                    match (&*record, 25_u16).to_socket_addrs() {
-                        Err(_) => {
-                            warn!("ToSocketAddr FAILED FOR {}: {}",
-                                  recipient.email_addr,
-                                     &*record);
-                            continue; // MX record invalid?
-                        },
-                        Ok(mut iter) => match iter.next() {
-                            Some(sa) => mx_records.push(sa),
-                            None => continue, // No MX records
-                        }
-                    }
+        let mx_record_strings = get_mx_records_for_domain(&*recipient.domain, resolver);
+        let mut mx_record_sockaddrs: Vec<SocketAddr> = Vec::new();
+        for record in mx_record_strings {
+            match (&*record, 25_u16).to_socket_addrs() {
+                Err(_) => {
+                    warn!("ToSocketAddr FAILED FOR {}: {}",
+                          recipient.email_addr,
+                          &*record);
+                    continue; // MX record invalid?
+                },
+                Ok(mut iter) => match iter.next() {
+                    Some(sa) => mx_record_sockaddrs.push(sa),
+                    None => continue, // No MX records
                 }
-                if mx_records.len() == 0 {
-                    recipient.result = DeliveryResult::Failed(
-                        "MX records found but none are valid".to_owned());
-                    continue;
-                }
-                mx_records
             }
-        };
-        recipient.mx_servers = Some(mx_records);
+        }
+        if mx_record_sockaddrs.len() == 0 {
+            recipient.result = DeliveryResult::Failed(
+                "MX records found but none are valid".to_owned());
+            continue;
+        }
+
+        recipient.mx_servers = Some(mx_record_sockaddrs);
         debug!("DEBUG: got mx servers for {}: {:?}",
                recipient.email_addr,
                recipient.mx_servers.as_ref().unwrap());
@@ -52,13 +42,50 @@ pub fn get_mx_records_for_email(internal_status: &mut InternalStatus,
 
 // Get MX records for a domain, in order of preference
 fn get_mx_records_for_domain(domain: &str, resolver: &Resolver)
-                             -> Result<Vec<String>, Error>
+                             -> Vec<String>
 {
-    let response = resolver.mx_lookup(domain)?;
+    use std::cmp::Ordering;
+
+    let response = match resolver.mx_lookup(domain) {
+        Ok(res) => res,
+        Err(_) => {
+            // fallback to the domain (RFC 5321)
+            return vec![domain.to_owned()];
+        }
+    };
 
     let mut records: Vec<(u16,String)> = response.iter()
         .map(|mx| (mx.preference(), mx.exchange().to_string()))
         .collect();
+
+    if records.len() == 0 {
+        // fallback to the domain (RFC 5321)
+        return vec![domain.to_owned()];
+    }
+
+    // Sort by priority
     records.sort_by(|a,b| a.0.cmp(&b.0));
-    Ok( records.into_iter().map(|(_,exch)| exch).collect() )
+
+    // Move any results that end in a digit to the end (domain names are preferred
+    // over IP addresses, regardless of their MX setting, due to the inability to
+    // verify certificates with IP addresses)
+    records.sort_by(|a,b| {
+        let a_is_ip = if let Some(last) = a.1.chars().rev().next() {
+            if last.is_digit(10) { true }
+            else { false }
+        } else { false };
+
+        let b_is_ip = if let Some(last) = b.1.chars().rev().next() {
+            if last.is_digit(10) { true }
+            else { false }
+        } else { false };
+
+        match (a_is_ip, b_is_ip) {
+            (true, false) => Ordering::Less,
+            (false, true) => Ordering::Greater,
+            _ => Ordering::Equal
+        }
+    });
+
+    records.into_iter().map(|(_,exch)| exch).collect()
 }
