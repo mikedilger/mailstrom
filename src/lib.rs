@@ -56,6 +56,8 @@
 //!         Config {
 //!             helo_name: "my.host.domainname".to_owned(),
 //!             smtp_timeout_secs: 30,
+//!             resolver_config: Default::default(),
+//!             resolver_opts: Default::default(),
 //!         },
 //!         MemoryStorage::new());
 //!
