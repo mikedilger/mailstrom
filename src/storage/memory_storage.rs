@@ -3,7 +3,7 @@ use std::error::Error;
 use std::fmt;
 use std::collections::HashMap;
 use email_format::Email;
-use internal_status::InternalStatus;
+use internal_message_status::InternalMessageStatus;
 use storage::{MailstromStorage, MailstromStorageError};
 
 #[derive(Debug)]
@@ -33,7 +33,7 @@ impl fmt::Display for MemoryStorageError {
 
 pub struct Record {
     email: Email,
-    status: InternalStatus,
+    status: InternalMessageStatus,
     retrieved: bool,
 }
 
@@ -48,30 +48,30 @@ impl MemoryStorage {
 impl MailstromStorage for MemoryStorage {
     type Error = MemoryStorageError;
 
-    fn store(&mut self, email: Email, internal_status: InternalStatus)
+    fn store(&mut self, email: Email, internal_message_status: InternalMessageStatus)
              -> Result<(), MemoryStorageError>
     {
-        self.0.insert(internal_status.message_id.clone(), Record {
+        self.0.insert(internal_message_status.message_id.clone(), Record {
             email: email,
-            status: internal_status,
+            status: internal_message_status,
             retrieved: false
         });
         Ok(())
     }
 
-    fn update_status(&mut self, internal_status: InternalStatus)
+    fn update_status(&mut self, internal_message_status: InternalMessageStatus)
                      -> Result<(), MemoryStorageError>
     {
-        let record: &mut Record = match self.0.get_mut(&internal_status.message_id) {
+        let record: &mut Record = match self.0.get_mut(&internal_message_status.message_id) {
             None => return Err(MemoryStorageError::NotFound),
             Some(record) => record,
         };
 
-        record.status = internal_status;
+        record.status = internal_message_status;
         Ok(())
     }
 
-    fn retrieve(&self, message_id: &str) -> Result<(Email, InternalStatus), MemoryStorageError>
+    fn retrieve(&self, message_id: &str) -> Result<(Email, InternalMessageStatus), MemoryStorageError>
     {
         let record: &Record = match self.0.get(message_id) {
             None => return Err(MemoryStorageError::NotFound),
@@ -80,7 +80,7 @@ impl MailstromStorage for MemoryStorage {
         Ok((record.email.clone(), record.status.clone()))
     }
 
-    fn retrieve_status(&self, message_id: &str) -> Result<InternalStatus, MemoryStorageError>
+    fn retrieve_status(&self, message_id: &str) -> Result<InternalMessageStatus, MemoryStorageError>
     {
         let record: &Record = match self.0.get(message_id) {
             None => return Err(MemoryStorageError::NotFound),
@@ -89,7 +89,7 @@ impl MailstromStorage for MemoryStorage {
         Ok(record.status.clone())
     }
 
-    fn retrieve_all_incomplete(&self) -> Result<Vec<InternalStatus>, Self::Error>
+    fn retrieve_all_incomplete(&self) -> Result<Vec<InternalMessageStatus>, Self::Error>
     {
         Ok(self.0.values()
            .filter_map(|record| {
@@ -99,7 +99,7 @@ impl MailstromStorage for MemoryStorage {
            .collect())
     }
 
-    fn retrieve_all_recent(&mut self) -> Result<Vec<InternalStatus>, Self::Error>
+    fn retrieve_all_recent(&mut self) -> Result<Vec<InternalMessageStatus>, Self::Error>
     {
         Ok(self.0.values_mut()
            .filter_map(|record| {

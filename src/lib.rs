@@ -99,12 +99,12 @@ pub mod error;
 
 /// This is exposed for implementers of `MailstromStorage` but otherwise should not
 /// be needed by users of this library.
-pub mod internal_status;
+pub mod internal_message_status;
 
 mod storage;
 
-pub mod status;
-pub use status::{Status, DeliveryResult};
+pub mod message_status;
+pub use message_status::{MessageStatus, DeliveryResult};
 
 
 use std::sync::{mpsc, Arc, RwLock};
@@ -115,7 +115,7 @@ use email_format::Email;
 
 use worker::{Worker, Message};
 use error::Error;
-use internal_status::InternalStatus;
+use internal_message_status::InternalMessageStatus;
 pub use storage::{MailstromStorage, MailstromStorageError, MemoryStorage};
 
 pub struct Mailstrom<S: MailstromStorage + 'static>
@@ -178,10 +178,10 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
     /// Send an email, getting back it's message-id
     pub fn send_email(&mut self, email: Email) -> Result<String, Error>
     {
-        let (internal_status, email) = try!(InternalStatus::create(
+        let (internal_message_status, email) = try!(InternalMessageStatus::create(
             email, &*self.config.helo_name));
 
-        let message_id = internal_status.message_id.clone();
+        let message_id = internal_message_status.message_id.clone();
 
         {
             // Lock the storage
@@ -191,7 +191,7 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
             };
 
             // Store the email
-            try!((*guard).store(email, internal_status));
+            try!((*guard).store(email, internal_message_status));
         }
 
         try!(self.sender.send(Message::SendEmail(message_id.clone())));
@@ -202,7 +202,7 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
     }
 
     // Query Status of email
-    pub fn query_status(&mut self, message_id: &str) -> Result<Status, Error>
+    pub fn query_status(&mut self, message_id: &str) -> Result<MessageStatus, Error>
     {
         let guard = match (*self.storage).read() {
             Ok(guard) => guard,
@@ -211,13 +211,13 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
 
         let status = try!((*guard).retrieve_status(message_id));
 
-        Ok(status.as_status())
+        Ok(status.as_message_status())
     }
 
     // Query recently queued and sent emails. This includes all emails where sending is not
     // yet complete, and also all emails where sending is complete but for which they have
     // not yet been reported on (via this function).
-    pub fn query_recent(&mut self) -> Result<Vec<Status>, Error>
+    pub fn query_recent(&mut self) -> Result<Vec<MessageStatus>, Error>
     {
         let mut guard = match (*self.storage).write() {
             Ok(guard) => guard,
@@ -225,7 +225,7 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
         };
 
         let vec_statuses = try!((*guard).retrieve_all_recent());
-        Ok(vec_statuses.iter().map(|s| s.as_status()).collect())
+        Ok(vec_statuses.iter().map(|s| s.as_message_status()).collect())
     }
 }
 

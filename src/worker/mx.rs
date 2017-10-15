@@ -1,16 +1,16 @@
 
 use trust_dns_resolver::Resolver;
-use internal_status::InternalStatus;
-use status::DeliveryResult;
+use internal_message_status::InternalMessageStatus;
+use message_status::DeliveryResult;
 
 // Get MX records for email recipients
-pub fn get_mx_records_for_email(internal_status: &mut InternalStatus,
+pub fn get_mx_records_for_email(internal_message_status: &mut InternalMessageStatus,
                                 resolver: &Resolver)
 {
     use std::net::{SocketAddr, ToSocketAddrs};
 
     // Look-up the MX records for each recipient
-    for recipient in &mut internal_status.recipients {
+    for recipient in &mut internal_message_status.recipients {
         let mx_record_strings = get_mx_records_for_domain(&*recipient.domain, resolver);
         let mut mx_record_sockaddrs: Vec<SocketAddr> = Vec::new();
         for record in mx_record_strings {

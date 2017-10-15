@@ -34,12 +34,12 @@ pub struct RecipientStatus {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Status {
+pub struct MessageStatus {
     pub message_id: String,
     pub recipient_status: Vec<RecipientStatus>,
 }
 
-impl Status {
+impl MessageStatus {
     pub fn succeeded(&self) -> bool
     {
         self.recipient_status.iter().all(|ref r| {

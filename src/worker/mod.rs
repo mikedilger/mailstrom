@@ -13,8 +13,8 @@ use std::net::SocketAddr;
 use trust_dns_resolver::Resolver;
 
 use email_format::Email;
-use internal_status::InternalStatus;
-use status::DeliveryResult;
+use internal_message_status::InternalMessageStatus;
+use message_status::DeliveryResult;
 use storage::MailstromStorage;
 use self::task::{Task, TaskType};
 use self::smtp::Envelope;
@@ -210,12 +210,12 @@ impl<S: MailstromStorage + 'static> Worker<S>
         }
     }
 
-    fn send_email(&mut self, email: Email, mut internal_status: InternalStatus,
+    fn send_email(&mut self, email: Email, mut internal_message_status: InternalMessageStatus,
                   resolver: &Resolver)
                   -> WorkerStatus
     {
         let mut need_mx: bool = false;
-        for recipient in &internal_status.recipients {
+        for recipient in &internal_message_status.recipients {
             if recipient.mx_servers.is_none() {
                 need_mx=true;
                 break;
@@ -223,19 +223,19 @@ impl<S: MailstromStorage + 'static> Worker<S>
         }
 
         if need_mx {
-            ::worker::mx::get_mx_records_for_email(&mut internal_status,
+            ::worker::mx::get_mx_records_for_email(&mut internal_message_status,
                                                    &resolver);
 
             // Update storage with this MX information
-            let status = self.update_status(&internal_status);
+            let status = self.update_status(&internal_message_status);
             if status != WorkerStatus::Ok {
                 return status;
             }
         }
 
         // Fail all recipients after too many worker attempts
-        if internal_status.attempts_remaining == 0 {
-            for recipient in internal_status.recipients.iter_mut() {
+        if internal_message_status.attempts_remaining == 0 {
+            for recipient in internal_message_status.recipients.iter_mut() {
                 let mut data: Option<(u8, String)> = None;
                 if let DeliveryResult::Deferred(attempts, ref msg) = recipient.result {
                     data = Some((attempts, msg.clone()));
@@ -249,36 +249,36 @@ impl<S: MailstromStorage + 'static> Worker<S>
         }
 
         // Attempt delivery of the email
-        if deliver(&email, &mut internal_status, &self.config) {
-            internal_status.attempts_remaining = 0;
+        if deliver(&email, &mut internal_message_status, &self.config) {
+            internal_message_status.attempts_remaining = 0;
         } else {
-            internal_status.attempts_remaining = internal_status.attempts_remaining - 1;
+            internal_message_status.attempts_remaining = internal_message_status.attempts_remaining - 1;
         }
 
         // Update storage with the new delivery results
-        let status = self.update_status(&internal_status);
+        let status = self.update_status(&internal_message_status);
         if status != WorkerStatus::Ok {
             return status;
         }
 
-        if internal_status.attempts_remaining > 0 {
-            let attempt = 3 - internal_status.attempts_remaining;
+        if internal_message_status.attempts_remaining > 0 {
+            let attempt = 3 - internal_message_status.attempts_remaining;
             let delay = Duration::from_secs(60 * 3u64.pow(attempt as u32));
             trace!("Queueing task to retry {} in {} seconds",
-                   &internal_status.message_id, delay.as_secs());
+                   &internal_message_status.message_id, delay.as_secs());
 
             // Create a new worker task to retry later
             self.tasks.insert( Task {
                 tasktype: TaskType::Resend,
                 time: Instant::now() + delay,
-                message_id: internal_status.message_id.clone(),
+                message_id: internal_message_status.message_id.clone(),
             });
         }
 
         WorkerStatus::Ok
     }
 
-    fn update_status(&mut self, internal_status: &InternalStatus)
+    fn update_status(&mut self, internal_message_status: &InternalMessageStatus)
        -> WorkerStatus
     {
         // Lock the storage
@@ -290,7 +290,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
             },
         };
 
-        if let Err(e) = (*guard).update_status(internal_status.clone()) {
+        if let Err(e) = (*guard).update_status(internal_message_status.clone()) {
             error!("{:?}", e);
             return WorkerStatus::StorageWriteFailed;
         }
@@ -302,7 +302,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
         match task.tasktype {
             TaskType::Resend => {
                 debug!("(worker) resending a deferred email");
-                let (email, internal_status) = {
+                let (email, internal_message_status) = {
                     let guard = match (*self.storage).read() {
                         Ok(guard) => guard,
                         Err(_) => return WorkerStatus::LockPoisoned,
@@ -315,7 +315,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
                         Ok(x) => x
                     }
                 };
-                return self.send_email(email, internal_status, resolver);
+                return self.send_email(email, internal_message_status, resolver);
             },
         }
     }
@@ -323,12 +323,12 @@ impl<S: MailstromStorage + 'static> Worker<S>
 
 struct MxDelivery {
     mx_server: SocketAddr,
-    recipients: Vec<usize> // index into InternalStatus.recipients
+    recipients: Vec<usize> // index into InternalMessageStatus.recipients
 }
 
 // Organize delivery for one-SMTP-delivery per MX server, and then use smtp_deliver()
 // Returns true only if all recipient deliveries have been completed (rather than deferred)
-fn deliver(email: &Email, internal_status: &mut InternalStatus, config: &Config) -> bool
+fn deliver(email: &Email, internal_message_status: &mut InternalMessageStatus, config: &Config) -> bool
 {
     let mut deferred_some: bool = false;
 
@@ -336,9 +336,9 @@ fn deliver(email: &Email, internal_status: &mut InternalStatus, config: &Config)
     // by recipient.
     let mut mx_delivery: Vec<MxDelivery> = Vec::new();
 
-    for r_index in 0..internal_status.recipients.len() {
+    for r_index in 0..internal_message_status.recipients.len() {
 
-        let recip = &mut internal_status.recipients[r_index];
+        let recip = &mut internal_message_status.recipients[r_index];
 
         // Skip this recipient if already completed
         match recip.result {
@@ -401,13 +401,13 @@ fn deliver(email: &Email, internal_status: &mut InternalStatus, config: &Config)
 
         let envelope = Envelope::new(
             &email,
-            internal_status.message_id.clone(),
+            internal_message_status.message_id.clone(),
             mxd.recipients.iter()
                 .filter_map(|r| {
-                    if internal_status.recipients[*r].result.completed() {
+                    if internal_message_status.recipients[*r].result.completed() {
                         None
                     } else {
-                        Some(internal_status.recipients[*r].smtp_email_addr.clone())
+                        Some(internal_message_status.recipients[*r].smtp_email_addr.clone())
                     }
                 })
                 .collect());
@@ -431,20 +431,20 @@ fn deliver(email: &Email, internal_status: &mut InternalStatus, config: &Config)
             if let DeliveryResult::Deferred(_, ref newmsg) = result {
                 deferred_some = true;
                 let mut data: Option<u8> = None;
-                if let DeliveryResult::Deferred(attempts, _) = internal_status.recipients[*r].result
+                if let DeliveryResult::Deferred(attempts, _) = internal_message_status.recipients[*r].result
                 {
                     data = Some(attempts);
                 }
                 if data.is_some() {
                     let attempts = data.unwrap();
-                    internal_status.recipients[*r].result = DeliveryResult::Deferred(
+                    internal_message_status.recipients[*r].result = DeliveryResult::Deferred(
                         attempts + 1, newmsg.clone());
                     continue;
                 }
             }
 
             // For everyone else, just take the result
-            internal_status.recipients[*r].result = result.clone();
+            internal_message_status.recipients[*r].result = result.clone();
         }
 
     }

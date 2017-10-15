@@ -5,11 +5,11 @@ use email_format::Email;
 use email_format::rfc5322::headers::Bcc;
 use email_format::rfc5322::types::{AddressList, Address, GroupList, Mailbox};
 use error::Error;
-use status::{Status, RecipientStatus, DeliveryResult};
+use message_status::{MessageStatus, RecipientStatus, DeliveryResult};
 
 /// Information about the recipients of an email to be sent
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Recipient {
+pub struct InternalRecipientStatus {
     /// The recipient's email address (for display)
     pub email_addr: String,
 
@@ -33,14 +33,14 @@ pub struct Recipient {
 /// An email to be sent (internal format).  This is exposed publicly for
 /// implementers of `MailstromStorage`
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InternalStatus {
+pub struct InternalMessageStatus {
     /// The parsed-out (or generated) message ID
     pub message_id: String,
 
     /// The parsed-out list of recipients, and the state each is in.  If this
     /// is None, then the recipient information has not been determined yet
     /// (MX record lookups take some time).
-    pub recipients: Vec<Recipient>,
+    pub recipients: Vec<InternalRecipientStatus>,
 
     /// Attempts remaining. This counts backwards to zero. If all deliveries are
     /// complete (permanent success or failure), it is set to zero.
@@ -51,10 +51,10 @@ pub struct InternalStatus {
     pub attempts_remaining: u8,
 }
 
-impl InternalStatus
+impl InternalMessageStatus
 {
     pub fn create(mut email: Email, helo_name: &str)
-                  -> Result<(InternalStatus, Email), Error>
+                  -> Result<(InternalMessageStatus, Email), Error>
     {
         let message_id = match email.get_message_id() {
             Some(mid) => {
@@ -75,16 +75,16 @@ impl InternalStatus
         // Strip any Bcc header line (to make it blind)
         email.clear_bcc();
 
-        Ok((InternalStatus {
+        Ok((InternalMessageStatus {
             message_id: message_id,
             recipients: recipients,
             attempts_remaining: 3,
         }, email))
     }
 
-    pub fn as_status(&self) -> Status
+    pub fn as_message_status(&self) -> MessageStatus
     {
-        Status {
+        MessageStatus {
             message_id: self.message_id.clone(),
             recipient_status: self.recipients.iter().map(|r| RecipientStatus {
                 recipient: r.email_addr.clone(),
@@ -94,9 +94,9 @@ impl InternalStatus
     }
 }
 
-fn determine_recipients(email: &Email) -> Vec<Recipient>
+fn determine_recipients(email: &Email) -> Vec<InternalRecipientStatus>
 {
-    let mut recipients: Vec<Recipient> = Vec::new();
+    let mut recipients: Vec<InternalRecipientStatus> = Vec::new();
 
     if let Some(to) = email.get_to() {
         recipients.extend(address_list_recipients(to.0));
@@ -113,9 +113,9 @@ fn determine_recipients(email: &Email) -> Vec<Recipient>
     recipients
 }
 
-fn address_list_recipients(address_list: AddressList) -> Vec<Recipient>
+fn address_list_recipients(address_list: AddressList) -> Vec<InternalRecipientStatus>
 {
-    let mut recipients: Vec<Recipient> = Vec::new();
+    let mut recipients: Vec<InternalRecipientStatus> = Vec::new();
 
     // extract out each recipient
     for address in address_list.0 {
@@ -141,7 +141,7 @@ fn address_list_recipients(address_list: AddressList) -> Vec<Recipient>
     recipients
 }
 
-fn recipient_from_mailbox(mb: Mailbox) -> Recipient
+fn recipient_from_mailbox(mb: Mailbox) -> InternalRecipientStatus
 {
     let (email_addr, smtp_email_addr, domain) = match mb {
         Mailbox::NameAddr(na) => (format!("{}", na),
@@ -152,7 +152,7 @@ fn recipient_from_mailbox(mb: Mailbox) -> Recipient
                                    format!("{}", ads.domain)),
     };
 
-    Recipient {
+    InternalRecipientStatus {
         email_addr: email_addr.trim().to_owned(),
         smtp_email_addr: smtp_email_addr.trim().to_owned(),
         domain: domain.trim().to_owned(),
