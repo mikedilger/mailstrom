@@ -10,6 +10,7 @@ use storage::MailstromStorageError;
 pub enum Error {
     Send(SendError<Message>),
     EmailParser(ParseError),
+    General(String),
     Storage(String),
     DnsUnavailable,
     Lock,
@@ -27,6 +28,13 @@ impl From<ParseError> for Error {
     fn from(e: ParseError) -> Error
     {
         Error::EmailParser(e)
+    }
+}
+
+impl From<String> for Error {
+    fn from(e: String) -> Error
+    {
+        Error::General(e)
     }
 }
 
@@ -53,6 +61,8 @@ impl ::std::fmt::Display for Error {
                 format!("{}: {:?}", self.description(), e).fmt(f),
             Error::EmailParser(ref e) =>
                 format!("{}: {:?}", self.description(), e).fmt(f),
+            Error::General(ref e) =>
+                format!("{}: {}", self.description(), e).fmt(f),
             Error::Storage(ref s) =>
                 format!("{}: {}", self.description(), s).fmt(f),
             _ => format!("{}", self.description()).fmt(f),
@@ -66,6 +76,7 @@ impl ::std::error::Error for Error {
         match *self {
             Error::Send(_) => "Unable to send message to worker",
             Error::EmailParser(_) => "Email does not parse",
+            Error::General(_) => "General error",
             Error::Storage(_) => "Could not store or retrieve email state data",
             Error::DnsUnavailable => "DNS unavailable",
             Error::Lock => "Lock poisoned",
