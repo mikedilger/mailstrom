@@ -6,42 +6,25 @@ use lettre::transport::smtp::error::Error as LettreSmtpError;
 use lettre::transport::EmailTransport;
 use lettre::email::Envelope as LettreEnvelope;
 use lettre::email::SendableEmail;
-use email_format::Email;
-use email_format::rfc5322::types::Mailbox;
+use prepared_email::PreparedEmail;
 use delivery_result::DeliveryResult;
 use ::Config;
 
 pub struct Envelope<'a> {
     pub message_id: String,
     pub lettre_envelope: LettreEnvelope,
-    pub email: &'a Email,
+    pub email: &'a PreparedEmail,
 }
 
 impl<'a> Envelope<'a> {
-    pub fn new(email: &'a Email, message_id: String, to_addresses: Vec<String>)
+    pub fn new(email: &'a PreparedEmail, message_id: String, to_addresses: Vec<String>)
                -> Envelope<'a>
     {
-        let f = match email.get_sender() {
-            // Use sender if available
-            Some(sender) => match sender.0 {
-                Mailbox::NameAddr(ref na) =>
-                    format!("{}", na.angle_addr.addr_spec).trim().to_owned(),
-                Mailbox::AddrSpec(ref aspec) =>
-                    format!("{}", aspec).trim().to_owned(),
-            },
-            None => match (email.get_from().0).0[0] {
-                Mailbox::NameAddr(ref na) =>
-                    format!("{}", na.angle_addr.addr_spec).trim().to_owned(),
-                Mailbox::AddrSpec(ref aspec) =>
-                    format!("{}", aspec).trim().to_owned(),
-            },
-        };
-
         Envelope {
             message_id: message_id,
             lettre_envelope: LettreEnvelope {
                 to: to_addresses,
-                from: f,
+                from: email.from.clone(),
             },
             email: email
         }
@@ -56,7 +39,8 @@ impl<'a> SendableEmail for Envelope<'a> {
         format!("{}", self.message_id)
     }
     fn message(self) -> String {
-        format!("{}", self.email)
+        // this will be direct when we switch to lettre 0.7
+        String::from_utf8(self.email.message.clone()).unwrap()
     }
 }
 

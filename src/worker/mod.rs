@@ -12,7 +12,7 @@ use std::net::SocketAddr;
 
 use trust_dns_resolver::Resolver;
 
-use email_format::Email;
+use prepared_email::PreparedEmail;
 use message_status::InternalMessageStatus;
 use delivery_result::DeliveryResult;
 use storage::MailstromStorage;
@@ -210,7 +210,9 @@ impl<S: MailstromStorage + 'static> Worker<S>
         }
     }
 
-    fn send_email(&mut self, email: Email, mut internal_message_status: InternalMessageStatus,
+    fn send_email(&mut self,
+                  email: PreparedEmail,
+                  mut internal_message_status: InternalMessageStatus,
                   resolver: &Resolver)
                   -> WorkerStatus
     {
@@ -328,7 +330,8 @@ struct MxDelivery {
 
 // Organize delivery for one-SMTP-delivery per MX server, and then use smtp_deliver()
 // Returns true only if all recipient deliveries have been completed (rather than deferred)
-fn deliver(email: &Email, internal_message_status: &mut InternalMessageStatus, config: &Config) -> bool
+fn deliver(email: &PreparedEmail, internal_message_status: &mut InternalMessageStatus,
+           config: &Config) -> bool
 {
     let mut deferred_some: bool = false;
 
@@ -400,7 +403,7 @@ fn deliver(email: &Email, internal_message_status: &mut InternalMessageStatus, c
     for mxd in &mut mx_delivery {
 
         let envelope = Envelope::new(
-            &email,
+            email,
             internal_message_status.message_id.clone(),
             mxd.recipients.iter()
                 .filter_map(|r| {

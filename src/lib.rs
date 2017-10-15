@@ -104,10 +104,13 @@ pub use delivery_result::DeliveryResult;
 mod recipient_status;
 pub use recipient_status::RecipientStatus;
 
-mod storage;
-
 pub mod message_status;
 pub use message_status::MessageStatus;
+
+pub mod prepared_email;
+pub use prepared_email::PreparedEmail;
+
+mod storage;
 
 use std::sync::{mpsc, Arc, RwLock};
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -180,8 +183,8 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
     /// Send an email, getting back it's message-id
     pub fn send_email(&mut self, email: Email) -> Result<String, Error>
     {
-        let (internal_message_status, email) = try!(InternalMessageStatus::create(
-            email, &*self.config.helo_name));
+        let (prepared_email, internal_message_status) =
+            ::prepared_email::prepare_email(email, &*self.config.helo_name)?;
 
         let message_id = internal_message_status.message_id.clone();
 
@@ -193,7 +196,7 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
             };
 
             // Store the email
-            try!((*guard).store(email, internal_message_status));
+            try!((*guard).store(prepared_email, internal_message_status));
         }
 
         try!(self.sender.send(Message::SendEmail(message_id.clone())));
