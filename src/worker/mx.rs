@@ -1,7 +1,7 @@
 
 use trust_dns_resolver::Resolver;
-use internal_message_status::InternalMessageStatus;
-use message_status::DeliveryResult;
+use message_status::InternalMessageStatus;
+use delivery_result::DeliveryResult;
 use super::is_ip;
 
 // Get MX records for email recipients

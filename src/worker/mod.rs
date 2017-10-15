@@ -13,8 +13,8 @@ use std::net::SocketAddr;
 use trust_dns_resolver::Resolver;
 
 use email_format::Email;
-use internal_message_status::InternalMessageStatus;
-use message_status::DeliveryResult;
+use message_status::InternalMessageStatus;
+use delivery_result::DeliveryResult;
 use storage::MailstromStorage;
 use self::task::{Task, TaskType};
 use self::smtp::Envelope;

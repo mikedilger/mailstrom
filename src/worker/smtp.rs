@@ -6,9 +6,9 @@ use lettre::transport::smtp::error::Error as LettreSmtpError;
 use lettre::transport::EmailTransport;
 use lettre::email::Envelope as LettreEnvelope;
 use lettre::email::SendableEmail;
-use message_status::DeliveryResult;
 use email_format::Email;
 use email_format::rfc5322::types::Mailbox;
+use delivery_result::DeliveryResult;
 use ::Config;
 
 pub struct Envelope<'a> {

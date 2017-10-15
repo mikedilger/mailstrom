@@ -3,7 +3,7 @@ pub mod memory_storage;
 pub use self::memory_storage::MemoryStorage;
 
 use email_format::Email;
-use internal_message_status::InternalMessageStatus;
+use message_status::InternalMessageStatus;
 
 pub trait MailstromStorageError: ::std::error::Error { }
 

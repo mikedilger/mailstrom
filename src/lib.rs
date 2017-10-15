@@ -97,15 +97,16 @@ pub use worker::WorkerStatus;
 
 pub mod error;
 
-/// This is exposed for implementers of `MailstromStorage` but otherwise should not
-/// be needed by users of this library.
-pub mod internal_message_status;
+mod delivery_result;
+pub use delivery_result::DeliveryResult;
+
+mod recipient_status;
+pub use recipient_status::RecipientStatus;
 
 mod storage;
 
 pub mod message_status;
-pub use message_status::{MessageStatus, DeliveryResult};
-
+pub use message_status::MessageStatus;
 
 use std::sync::{mpsc, Arc, RwLock};
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -115,7 +116,7 @@ use email_format::Email;
 
 use worker::{Worker, Message};
 use error::Error;
-use internal_message_status::InternalMessageStatus;
+pub use message_status::InternalMessageStatus;
 pub use storage::{MailstromStorage, MailstromStorageError, MemoryStorage};
 
 pub struct Mailstrom<S: MailstromStorage + 'static>

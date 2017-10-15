@@ -3,7 +3,7 @@ use std::error::Error;
 use std::fmt;
 use std::collections::HashMap;
 use email_format::Email;
-use internal_message_status::InternalMessageStatus;
+use message_status::InternalMessageStatus;
 use storage::{MailstromStorage, MailstromStorageError};
 
 #[derive(Debug)]
