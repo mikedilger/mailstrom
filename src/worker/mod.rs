@@ -451,3 +451,12 @@ fn deliver(email: &Email, internal_message_status: &mut InternalMessageStatus, c
 
     !deferred_some
 }
+
+pub fn is_ip(s: &str) -> bool
+{
+    if let Some(last) = s.chars().rev().next() {
+        last.is_digit(10)
+    } else {
+        false
+    }
+}

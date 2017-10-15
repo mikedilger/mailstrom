@@ -2,6 +2,7 @@
 use trust_dns_resolver::Resolver;
 use internal_message_status::InternalMessageStatus;
 use message_status::DeliveryResult;
+use super::is_ip;
 
 // Get MX records for email recipients
 pub fn get_mx_records_for_email(internal_message_status: &mut InternalMessageStatus,
@@ -70,16 +71,8 @@ fn get_mx_records_for_domain(domain: &str, resolver: &Resolver)
     // over IP addresses, regardless of their MX setting, due to the inability to
     // verify certificates with IP addresses)
     records.sort_by(|a,b| {
-        let a_is_ip = if let Some(last) = a.1.chars().rev().next() {
-            if last.is_digit(10) { true }
-            else { false }
-        } else { false };
-
-        let b_is_ip = if let Some(last) = b.1.chars().rev().next() {
-            if last.is_digit(10) { true }
-            else { false }
-        } else { false };
-
+        let a_is_ip = is_ip(&*(a.1));
+        let b_is_ip = is_ip(&*(b.1));
         match (a_is_ip, b_is_ip) {
             (true, false) => Ordering::Less,
             (false, true) => Ordering::Greater,
