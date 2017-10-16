@@ -42,13 +42,13 @@ pub fn smtp_delivery<'a>(prepared_email: &PreparedEmail,
         Ok(builder) => builder,
         Err(e) => {
             info!("(worker) failed to create TLS Connector: {:?}", e);
-            return DeliveryResult::Failed( format!("{:?}", e) )
+            return DeliveryResult::Failed( format!("Failed to create TLS connector: {:?}", e) )
         }
     };
 
     if let Err(e) = tls_builder.supported_protocols(DEFAULT_TLS_PROTOCOLS) {
         info!("(worker) failed to set default tls protocols: {:?}", e);
-        return DeliveryResult::Failed( format!("{:?}", e) )
+        return DeliveryResult::Failed( format!("Failed to set supported protocols: {:?}", e) )
     }
 
     let tls_parameters = ClientTlsParameters::new(
@@ -58,7 +58,7 @@ pub fn smtp_delivery<'a>(prepared_email: &PreparedEmail,
 
     let mailer = match SmtpTransportBuilder::new(
         smtp_server_sockaddr,
-        ClientSecurity::Opportunistic(tls_parameters))
+        ClientSecurity::Required(tls_parameters))
     {
         Ok(m) => m,
         Err(e) => {
