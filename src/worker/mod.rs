@@ -91,10 +91,10 @@ impl<S: MailstromStorage + 'static> Worker<S>
             paused: true,
         };
 
-        // Load the incomplete (deferred) email statuses, for tasking
+        // Load the incomplete (queued and/or deferred) email statuses, for tasking
         if let Ok(guard) = (*worker.storage).write() {
             if let Ok(mut isvec) = (*guard).retrieve_all_incomplete() {
-                // Create one task for each deferred email
+                // Create one task for each queued/deferred email
                 for is in isvec.drain(..) {
                     worker.tasks.insert( Task {
                         tasktype: TaskType::Resend,
@@ -158,6 +158,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
             match self.receiver.recv_timeout(timeout) {
                 Ok(message) => match message {
                     Message::Start => {
+                        trace!("(worker) starting");
                         self.paused = false;
                     },
                     Message::SendEmail(message_id) => {
@@ -208,6 +209,28 @@ impl<S: MailstromStorage + 'static> Worker<S>
         }
     }
 
+    fn handle_task(&mut self, task: &Task, resolver: &Resolver) -> WorkerStatus {
+        match task.tasktype {
+            TaskType::Resend => {
+                debug!("(worker) resending a (queued/deferred) email");
+                let (email, internal_message_status) = {
+                    let guard = match (*self.storage).read() {
+                        Ok(guard) => guard,
+                        Err(_) => return WorkerStatus::LockPoisoned,
+                    };
+                    match (*guard).retrieve(&*task.message_id) {
+                        Err(e) => {
+                            warn!("Unable to retrieve task: {:?}", e);
+                            return WorkerStatus::Ok
+                        },
+                        Ok(x) => x
+                    }
+                };
+                return self.send_email(email, internal_message_status, resolver);
+            },
+        }
+    }
+
     fn send_email(&mut self,
                   email: PreparedEmail,
                   mut internal_message_status: InternalMessageStatus,
@@ -252,7 +275,8 @@ impl<S: MailstromStorage + 'static> Worker<S>
         if deliver(&email, &mut internal_message_status, &self.config) {
             internal_message_status.attempts_remaining = 0;
         } else {
-            internal_message_status.attempts_remaining = internal_message_status.attempts_remaining - 1;
+            internal_message_status.attempts_remaining =
+                internal_message_status.attempts_remaining - 1;
         }
 
         // Update storage with the new delivery results
@@ -263,7 +287,9 @@ impl<S: MailstromStorage + 'static> Worker<S>
 
         if internal_message_status.attempts_remaining > 0 {
             let attempt = 3 - internal_message_status.attempts_remaining;
-            let delay = Duration::from_secs(60 * 3u64.pow(attempt as u32));
+            // exponential backoff
+            let delay = Duration::from_secs(self.config.base_resend_delay_secs
+                                            * 3u64.pow(attempt as u32));
             trace!("Queueing task to retry {} in {} seconds",
                    &internal_message_status.message_id, delay.as_secs());
 
@@ -296,28 +322,6 @@ impl<S: MailstromStorage + 'static> Worker<S>
         }
 
         WorkerStatus::Ok
-    }
-
-    fn handle_task(&mut self, task: &Task, resolver: &Resolver) -> WorkerStatus {
-        match task.tasktype {
-            TaskType::Resend => {
-                debug!("(worker) resending a deferred email");
-                let (email, internal_message_status) = {
-                    let guard = match (*self.storage).read() {
-                        Ok(guard) => guard,
-                        Err(_) => return WorkerStatus::LockPoisoned,
-                    };
-                    match (*guard).retrieve(&*task.message_id) {
-                        Err(e) => {
-                            warn!("Unable to retrieve task: {:?}", e);
-                            return WorkerStatus::Ok
-                        },
-                        Ok(x) => x
-                    }
-                };
-                return self.send_email(email, internal_message_status, resolver);
-            },
-        }
     }
 }
 

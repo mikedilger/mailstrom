@@ -6,6 +6,7 @@ pub struct Config
 {
     pub helo_name: String,
     pub smtp_timeout_secs: u64,
+    pub base_resend_delay_secs: u64,
     pub resolver_config: ResolverConfig,
     pub resolver_opts: ResolverOpts,
 }
@@ -15,6 +16,7 @@ impl Default for Config {
         Config {
             helo_name: "localhost".to_string(),
             smtp_timeout_secs: 60,
+            base_resend_delay_secs: 60,
             resolver_config: ResolverConfig::default(),
             resolver_opts: ResolverOpts::default()
         }
