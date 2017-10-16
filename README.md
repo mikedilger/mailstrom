@@ -1,5 +1,5 @@
-NOTE: The newer 0.3.0 version is not on crates.io because it depends on a
-      specific git commit of the lettre crate.
+NOTE: 0.4 will be released after several issues found in testing are resolved to my
+      satisfaction.
 
 # Mailstrom
 
@@ -20,21 +20,18 @@ background worker thread.  It does the following:
    mail servers over SMTP, thus not requiring any local SMTP relay.  Uses the
    [trust-dns](https://github.com/bluejekyll/trust-dns) library for DNS lookups
  * SMTP transport "heavy lifting" is performed via the [lettre](https://github.com/lettre/lettre)
-   library.  Uses STARTTLS where available.
+   library.  Uses STARTTLS.
  * Retries with exponential backoff for a fixed number of retries (currently fixed at 3),
    when the send result is Deferred
  * Uses a pluggable user-defined state management (persistence) layer.
 
 ## Limitations
 
- * Only works on glibc based operating systems, due to usage of the `resolv` library.
  * The [email-format](https://github.com/mikedilger/email-format) crate is somewhat incomplete
    and clunky still.  It doesn't incorporate RFC 6854 (updated From and Sender syntax) yet.
    It defines types one-to-one with ABNF parsing units, rather than as semantic units of meaning.
    And it doesn't let you use obvious types yet like setting the date from a DateTime type.
    However, these issues will be worked out in the near future.
- * This crate is not highly performant. If we wanted high throughput, we should use multiple
-   threads and base off of the tokio crate. Maybe in a future version.
 
 ## License
 
