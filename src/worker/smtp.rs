@@ -1,4 +1,5 @@
 
+use std::net::ToSocketAddrs;
 use std::time::Duration;
 use native_tls::TlsConnector;
 use lettre::smtp::{SmtpTransportBuilder, ClientSecurity};
@@ -13,13 +14,29 @@ use Config;
 
 // Deliver an email to an SMTP server
 pub fn smtp_delivery<'a>(prepared_email: &PreparedEmail,
-                         smtp_server: &str,
+                         smtp_server_domain: &str,
                          config: &Config,
                          attempt: u8)
                          -> DeliveryResult
 {
     trace!("SMTP delivery to [{}] at {}",
-           prepared_email.to.join(", "), smtp_server);
+           prepared_email.to.join(", "), smtp_server_domain);
+
+    let smtp_server_sockaddr = match (smtp_server_domain, 25_u16).to_socket_addrs() {
+        Err(e) => {
+            warn!("ToSocketAddr failed for ({}, 25): {:?}", smtp_server_domain, e);
+            return DeliveryResult::Failed(
+                format!("ToSockaddr failed for ({}, 25): {:?}", smtp_server_domain, e) )
+        },
+        Ok(mut iter) => match iter.next() {
+            Some(sa) => sa,
+            None => {
+                warn!("No SockAddrs for ({}, 25)", smtp_server_domain);
+                return DeliveryResult::Failed(
+                    format!("No SockAddrs for ({}, 25)", smtp_server_domain) )
+            }
+        }
+    };
 
     let mut tls_builder = match TlsConnector::builder() {
         Ok(builder) => builder,
@@ -35,12 +52,12 @@ pub fn smtp_delivery<'a>(prepared_email: &PreparedEmail,
     }
 
     let tls_parameters = ClientTlsParameters::new(
-        smtp_server.to_owned(),
+        smtp_server_domain.to_owned(),
         tls_builder.build().unwrap(),
     );
 
     let mailer = match SmtpTransportBuilder::new(
-        smtp_server.to_owned(),
+        smtp_server_sockaddr,
         ClientSecurity::Opportunistic(tls_parameters))
     {
         Ok(m) => m,
