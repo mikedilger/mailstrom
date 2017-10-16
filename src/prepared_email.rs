@@ -1,5 +1,6 @@
 
 use uuid::Uuid;
+use lettre::{SendableEmail, EmailAddress};
 use email_format::Email;
 use email_format::rfc5322::types::{Address, GroupList, Mailbox};
 use email_format::rfc5322::headers::Bcc;
@@ -11,6 +12,7 @@ use delivery_result::DeliveryResult;
 /// An email, prepared for delivery.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PreparedEmail {
+    pub to: Vec<String>,
     pub from: String,
     pub message_id: String,
     pub message: Vec<u8>,
@@ -38,6 +40,7 @@ pub fn prepare_email(mut email: Email, helo_name: &str)
     };
 
     let prepared_email = PreparedEmail {
+        to: recipients.iter().map(|r| r.smtp_email_addr.clone()).collect(),
         from: format!("{}", email.get_from()),
         message_id: message_id.clone(),
         message: format!("{}", email).into_bytes(),
@@ -113,5 +116,20 @@ fn recipient_from_mailbox(mb: Mailbox) -> InternalRecipientStatus
         mx_servers: None, // To be determined later by a worker task
         current_mx: 0,
         result: DeliveryResult::Queued,
+    }
+}
+
+impl<'a> SendableEmail<'a, &'a [u8]> for PreparedEmail {
+    fn to(&self) -> Vec<EmailAddress> {
+        self.to.iter().map(|s| EmailAddress::new(s.clone())).collect()
+    }
+    fn from(&self) -> EmailAddress {
+        EmailAddress::new(self.from.clone())
+    }
+    fn message_id(&self) -> String {
+        self.message_id.clone()
+    }
+    fn message(&'a self) -> Box<&'a [u8]> {
+        Box::new(&*self.message)
     }
 }

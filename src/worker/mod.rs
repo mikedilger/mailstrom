@@ -8,7 +8,6 @@ use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
-use std::net::SocketAddr;
 
 use trust_dns_resolver::Resolver;
 
@@ -17,7 +16,6 @@ use message_status::InternalMessageStatus;
 use delivery_result::DeliveryResult;
 use storage::MailstromStorage;
 use self::task::{Task, TaskType};
-use self::smtp::Envelope;
 use ::Config;
 
 const LOOP_DELAY: u64 = 10;
@@ -324,7 +322,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
 }
 
 struct MxDelivery {
-    mx_server: SocketAddr,
+    mx_server: String, // domain name
     recipients: Vec<usize> // index into InternalMessageStatus.recipients
 }
 
@@ -376,7 +374,7 @@ fn deliver(email: &PreparedEmail, internal_message_status: &mut InternalMessageS
         }
 
         // Sequence through this recipients MX servers
-        let mx_servers: &Vec<SocketAddr> = recip.mx_servers.as_ref().unwrap();
+        let mx_servers: &Vec<String> = recip.mx_servers.as_ref().unwrap();
 
         // Add to our MxDelivery vector
         for i in recip.current_mx .. mx_servers.len() {
@@ -387,7 +385,7 @@ fn deliver(email: &PreparedEmail, internal_message_status: &mut InternalMessageS
                 None => {
                     // Add this new MX server with the current recipient
                     mx_delivery.push(MxDelivery {
-                        mx_server: mx_servers[i],
+                        mx_server: mx_servers[i].clone(),
                         recipients: vec![ r_index ],
                     });
                 },
@@ -402,30 +400,32 @@ fn deliver(email: &PreparedEmail, internal_message_status: &mut InternalMessageS
     // Deliver on a per-mx basis
     for mxd in &mut mx_delivery {
 
-        let envelope = Envelope::new(
-            email,
-            internal_message_status.message_id.clone(),
-            mxd.recipients.iter()
-                .filter_map(|r| {
-                    if internal_message_status.recipients[*r].result.completed() {
-                        None
-                    } else {
-                        Some(internal_message_status.recipients[*r].smtp_email_addr.clone())
-                    }
-                })
-                .collect());
+        // Per-MX version of the prepared email
+        let mut mx_prepared_email = email.clone();
+
+        // Rebuild the 'To:' list; only add recipients for *this* MX server,
+        // and for which delivery has not already completed
+        mx_prepared_email.to = mxd.recipients.iter()
+            .filter_map(|r| {
+                if internal_message_status.recipients[*r].result.completed() {
+                    None
+                } else {
+                    Some(internal_message_status.recipients[*r].smtp_email_addr.clone())
+                }
+            })
+            .collect();
 
         // Skip this MX server if no addresses to deliver to
         // (this can happen if a previous server already handled its recipients and
         // the filter_map above removed them all)
-        if envelope.lettre_envelope.to.len() == 0 {
+        if mx_prepared_email.to.len() == 0 {
             continue;
         }
 
         // Actually deliver to this SMTP server
         // (we set attempt=1 but this gets replaced per recipient below)
         let result = ::worker::smtp::smtp_delivery(
-            envelope, &mxd.mx_server, config, 1);
+            &mx_prepared_email, &*mxd.mx_server, config, 1);
 
         for r in mxd.recipients.iter() {
 

@@ -1,59 +1,48 @@
-use std::net::SocketAddr;
+
 use std::time::Duration;
-use lettre::transport::smtp::{SmtpTransportBuilder, SecurityLevel};
-use lettre::transport::smtp::response::Severity;
-use lettre::transport::smtp::error::Error as LettreSmtpError;
-use lettre::transport::EmailTransport;
-use lettre::email::Envelope as LettreEnvelope;
-use lettre::email::SendableEmail;
+use native_tls::TlsConnector;
+use lettre::smtp::{SmtpTransportBuilder, ClientSecurity};
+use lettre::smtp::response::Severity;
+use lettre::smtp::error::Error as LettreSmtpError;
+use lettre::EmailTransport;
+use lettre::smtp::client::net::{ClientTlsParameters, DEFAULT_TLS_PROTOCOLS};
+use lettre::smtp::extension::ClientId;
 use prepared_email::PreparedEmail;
 use delivery_result::DeliveryResult;
-use ::Config;
-
-pub struct Envelope<'a> {
-    pub message_id: String,
-    pub lettre_envelope: LettreEnvelope,
-    pub email: &'a PreparedEmail,
-}
-
-impl<'a> Envelope<'a> {
-    pub fn new(email: &'a PreparedEmail, message_id: String, to_addresses: Vec<String>)
-               -> Envelope<'a>
-    {
-        Envelope {
-            message_id: message_id,
-            lettre_envelope: LettreEnvelope {
-                to: to_addresses,
-                from: email.from.clone(),
-            },
-            email: email
-        }
-    }
-}
-
-impl<'a> SendableEmail for Envelope<'a> {
-    fn envelope(&self) -> &LettreEnvelope {
-        &self.lettre_envelope
-    }
-    fn message_id(&self) -> String {
-        format!("{}", self.message_id)
-    }
-    fn message(self) -> String {
-        // this will be direct when we switch to lettre 0.7
-        String::from_utf8(self.email.message.clone()).unwrap()
-    }
-}
+use Config;
 
 // Deliver an email to an SMTP server
-pub fn smtp_delivery<'a>(envelope: Envelope<'a>,
-                         smtp_server: &SocketAddr, config: &Config, attempt: u8)
+pub fn smtp_delivery<'a>(prepared_email: &PreparedEmail,
+                         smtp_server: &str,
+                         config: &Config,
+                         attempt: u8)
                          -> DeliveryResult
 {
     trace!("SMTP delivery to [{}] at {}",
-           envelope.lettre_envelope.to.join(","),
-           smtp_server);
+           prepared_email.to.join(", "), smtp_server);
 
-    let mailer = match SmtpTransportBuilder::new( smtp_server ) {
+    let mut tls_builder = match TlsConnector::builder() {
+        Ok(builder) => builder,
+        Err(e) => {
+            info!("(worker) failed to create TLS Connector: {:?}", e);
+            return DeliveryResult::Failed( format!("{:?}", e) )
+        }
+    };
+
+    if let Err(e) = tls_builder.supported_protocols(DEFAULT_TLS_PROTOCOLS) {
+        info!("(worker) failed to set default tls protocols: {:?}", e);
+        return DeliveryResult::Failed( format!("{:?}", e) )
+    }
+
+    let tls_parameters = ClientTlsParameters::new(
+        smtp_server.to_owned(),
+        tls_builder.build().unwrap(),
+    );
+
+    let mailer = match SmtpTransportBuilder::new(
+        smtp_server.to_owned(),
+        ClientSecurity::Opportunistic(tls_parameters))
+    {
         Ok(m) => m,
         Err(e) => {
             return DeliveryResult::Failed(
@@ -62,16 +51,17 @@ pub fn smtp_delivery<'a>(envelope: Envelope<'a>,
     };
 
     // Configure the mailer
-    let mut mailer = mailer.hello_name( &*config.helo_name )
-        .security_level(SecurityLevel::Opportunistic) // STARTTLS if available
+    let mut mailer = mailer
+        // FIXME, our config.helo_name is unnecessarily limiting.
+        .hello_name( ClientId::Domain(config.helo_name.clone()) )
         .smtp_utf8(true) // is only used if the server supports it
         .timeout(Some(Duration::from_secs( config.smtp_timeout_secs )))
         .build();
 
-    let result = match mailer.send(envelope) {
+    let result = match mailer.send(prepared_email) {
         Ok(response) => {
             info!("(worker) delivery response: {:?}", response);
-            match response.severity() {
+            match response.code.severity {
                 Severity::PositiveCompletion | Severity::PositiveIntermediate => {
                     DeliveryResult::Delivered( format!("{:?}", response) )
                 },

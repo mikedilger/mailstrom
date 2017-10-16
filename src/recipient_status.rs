@@ -1,5 +1,4 @@
 
-use std::net::SocketAddr;
 use delivery_result::DeliveryResult;
 
 /// Per-Recipient Delivery Information
@@ -14,9 +13,10 @@ pub struct InternalRecipientStatus {
     /// The domain parsed off of the recipients email address
     pub domain: String,
 
-    /// The MX servers for the domain, in order of delivery preference.
-    /// If this is None, they have not been determined yet (DNS lookups take time).
-    pub mx_servers: Option<Vec<SocketAddr>>,
+    /// The MX servers for the domain (as domain names), in order of delivery
+    /// preference. If this is None, they have not been determined yet (DNS
+    /// lookups take time).
+    pub mx_servers: Option<Vec<String>>,
 
     /// The index into the MX server we are currently trying next
     pub current_mx: usize,
