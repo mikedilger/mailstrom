@@ -41,7 +41,7 @@ pub fn prepare_email(mut email: Email, helo_name: &str)
 
     let prepared_email = PreparedEmail {
         to: recipients.iter().map(|r| r.smtp_email_addr.clone()).collect(),
-        from: format!("{}", email.get_from()),
+        from: format!("{}", email.get_from().0),
         message_id: message_id.clone(),
         message: format!("{}", email).into_bytes(),
     };
