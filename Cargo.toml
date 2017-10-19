@@ -1,6 +1,6 @@
 [package]
 name = "mailstrom"
-version = "0.4.0-unstable"
+version = "0.4.0"
 description = "Email sender"
 authors = ["Mike Dilger <mike@optcomp.nz>"]
 readme = "README.md"
