@@ -23,7 +23,7 @@
 //! * The [email-format](https://github.com/mikedilger/email-format) crate is somewhat incomplete
 //!   and clunky still.  It doesn't incorporate RFC 6854 (updated From and Sender syntax) yet.
 //!   It defines types one-to-one with ABNF parsing units, rather than as semantic units of meaning.
-//!   And it doesn't let you use obvious types yet like setting the date from a DateTime type.
+//!   And it doesn't let you use obvious types yet like setting the date from a `DateTime` type.
 //!   However, these issues will be worked out in the near future.
 //!
 //! You can use it as follows:
@@ -140,7 +140,7 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
 
         let worker_status = Arc::new(AtomicU8::new(WorkerStatus::Ok as u8));
 
-        let mut worker = Worker::new(receiver, storage.clone(), worker_status.clone(),
+        let mut worker = Worker::new(receiver, Arc::clone(&storage), Arc::clone(&worker_status),
                                      config.clone());
 
         let _ = thread::spawn(move|| {

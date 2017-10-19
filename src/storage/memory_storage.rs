@@ -37,6 +37,7 @@ pub struct Record {
     retrieved: bool,
 }
 
+#[derive(Default)]
 pub struct MemoryStorage(HashMap<String, Record>);
 
 impl MemoryStorage {
@@ -105,7 +106,7 @@ impl MailstromStorage for MemoryStorage {
         Ok(self.0.values_mut()
            .filter_map(|record| {
                if record.status.attempts_remaining==0 {
-                   if record.retrieved==true {
+                   if record.retrieved {
                        None
                    } else {
                        record.retrieved = true;

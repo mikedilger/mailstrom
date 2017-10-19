@@ -35,7 +35,7 @@ fn get_mx_records_for_domain(domain: &str, resolver: &Resolver)
         .map(|mx| (mx.preference(), mx.exchange().to_string()))
         .collect();
 
-    if records.len() == 0 {
+    if records.is_empty() {
         // fallback to the domain (RFC 5321)
         return vec![domain.to_owned()];
     }

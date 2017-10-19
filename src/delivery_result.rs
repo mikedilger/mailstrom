@@ -20,8 +20,7 @@ pub enum DeliveryResult {
 impl DeliveryResult {
     pub fn completed(&self) -> bool {
         match *self {
-            DeliveryResult::Queued => false,
-            DeliveryResult::Deferred(_,_) => false,
+            DeliveryResult::Queued | DeliveryResult::Deferred(_,_) => false,
             _ => true
         }
     }

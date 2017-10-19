@@ -13,11 +13,11 @@ use delivery_result::DeliveryResult;
 use Config;
 
 // Deliver an email to an SMTP server
-pub fn smtp_delivery<'a>(prepared_email: &PreparedEmail,
-                         smtp_server_domain: &str,
-                         config: &Config,
-                         attempt: u8)
-                         -> DeliveryResult
+pub fn smtp_delivery(prepared_email: &PreparedEmail,
+                     smtp_server_domain: &str,
+                     config: &Config,
+                     attempt: u8)
+                     -> DeliveryResult
 {
     trace!("SMTP delivery to [{}] at {}",
            prepared_email.to.join(", "), smtp_server_domain);
@@ -56,9 +56,10 @@ pub fn smtp_delivery<'a>(prepared_email: &PreparedEmail,
         tls_builder.build().unwrap(),
     );
 
-    let client_security = match config.require_tls {
-        true => ClientSecurity::Required(tls_parameters),
-        false => ClientSecurity::Opportunistic(tls_parameters),
+    let client_security = if config.require_tls {
+        ClientSecurity::Required(tls_parameters)
+    } else {
+        ClientSecurity::Opportunistic(tls_parameters)
     };
 
     let mailer = match SmtpTransportBuilder::new(smtp_server_sockaddr, client_security) {

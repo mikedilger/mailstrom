@@ -47,7 +47,7 @@ pub struct MessageStatus {
 impl MessageStatus {
     pub fn succeeded(&self) -> bool
     {
-        self.recipient_status.iter().all(|ref r| {
+        self.recipient_status.iter().all(|r| {
             match r.result {
                 DeliveryResult::Delivered(_) => true,
                 _ => false
@@ -57,7 +57,7 @@ impl MessageStatus {
 
     pub fn completed(&self) -> bool
     {
-        self.recipient_status.iter().all(|ref r| {
+        self.recipient_status.iter().all(|r| {
             r.result.completed()
         })
     }

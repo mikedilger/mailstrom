@@ -118,7 +118,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
 
         let resolver: Resolver = match Resolver::new(
             self.config.resolver_config.clone(),
-            self.config.resolver_opts.clone())
+            self.config.resolver_opts)
         {
             Ok(resolver) => resolver,
             Err(e) => {
@@ -226,7 +226,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
                         Ok(x) => x
                     }
                 };
-                return self.send_email(email, internal_message_status, resolver);
+                self.send_email(email, internal_message_status, resolver)
             },
         }
     }
@@ -247,7 +247,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
 
         if need_mx {
             ::worker::mx::get_mx_records_for_email(&mut internal_message_status,
-                                                   &resolver);
+                                                   resolver);
 
             // Update storage with this MX information
             let status = self.update_status(&internal_message_status);
@@ -258,7 +258,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
 
         // Fail all recipients after too many worker attempts
         if internal_message_status.attempts_remaining == 0 {
-            for recipient in internal_message_status.recipients.iter_mut() {
+            for recipient in &mut internal_message_status.recipients {
                 let mut data: Option<(u8, String)> = None;
                 if let DeliveryResult::Deferred(attempts, ref msg) = recipient.result {
                     data = Some((attempts, msg.clone()));
@@ -275,8 +275,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
         if deliver(&email, &mut internal_message_status, &self.config) {
             internal_message_status.attempts_remaining = 0;
         } else {
-            internal_message_status.attempts_remaining =
-                internal_message_status.attempts_remaining - 1;
+            internal_message_status.attempts_remaining -= 1;
         }
 
         // Update storage with the new delivery results
@@ -289,7 +288,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
             let attempt = 3 - internal_message_status.attempts_remaining;
             // exponential backoff
             let delay = Duration::from_secs(self.config.base_resend_delay_secs
-                                            * 3u64.pow(attempt as u32));
+                                            * 3u64.pow(u32::from(attempt)));
             trace!("Queueing task to retry {} in {} seconds",
                    &internal_message_status.message_id, delay.as_secs());
 
@@ -347,8 +346,7 @@ fn deliver(email: &PreparedEmail, internal_message_status: &mut InternalMessageS
 
         // Skip this recipient if already completed
         match recip.result {
-            DeliveryResult::Delivered(_) => continue,
-            DeliveryResult::Failed(_) => continue,
+            DeliveryResult::Delivered(_) | DeliveryResult::Failed(_) => continue,
             _ => {}
         }
 
@@ -381,15 +379,15 @@ fn deliver(email: &PreparedEmail, internal_message_status: &mut InternalMessageS
         let mx_servers: &Vec<String> = recip.mx_servers.as_ref().unwrap();
 
         // Add to our MxDelivery vector
-        for i in recip.current_mx .. mx_servers.len() {
+        for item in mx_servers.iter().skip(recip.current_mx) {
             // Find the index of the MX server in our mx_delivery array
             let maybe_position = mx_delivery.iter().position(
-                |ref mxd| mxd.mx_server == mx_servers[i]);
+                |mxd| mxd.mx_server == *item);
             match maybe_position {
                 None => {
                     // Add this new MX server with the current recipient
                     mx_delivery.push(MxDelivery {
-                        mx_server: mx_servers[i].clone(),
+                        mx_server: item.clone(),
                         recipients: vec![ r_index ],
                     });
                 },
@@ -422,7 +420,7 @@ fn deliver(email: &PreparedEmail, internal_message_status: &mut InternalMessageS
         // Skip this MX server if no addresses to deliver to
         // (this can happen if a previous server already handled its recipients and
         // the filter_map above removed them all)
-        if mx_prepared_email.to.len() == 0 {
+        if mx_prepared_email.to.is_empty() {
             continue;
         }
 
@@ -431,7 +429,7 @@ fn deliver(email: &PreparedEmail, internal_message_status: &mut InternalMessageS
         let result = ::worker::smtp::smtp_delivery(
             &mx_prepared_email, &*mxd.mx_server, config, 1);
 
-        for r in mxd.recipients.iter() {
+        for r in &mxd.recipients {
 
             // If the result is deferred, and the previous result was deferred, then
             // bump the attempt number and update the reason message
