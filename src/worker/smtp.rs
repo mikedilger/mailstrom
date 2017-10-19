@@ -56,10 +56,12 @@ pub fn smtp_delivery<'a>(prepared_email: &PreparedEmail,
         tls_builder.build().unwrap(),
     );
 
-    let mailer = match SmtpTransportBuilder::new(
-        smtp_server_sockaddr,
-        ClientSecurity::Required(tls_parameters))
-    {
+    let client_security = match config.require_tls {
+        true => ClientSecurity::Required(tls_parameters),
+        false => ClientSecurity::Opportunistic(tls_parameters),
+    };
+
+    let mailer = match SmtpTransportBuilder::new(smtp_server_sockaddr, client_security) {
         Ok(m) => m,
         Err(e) => {
             return DeliveryResult::Failed(

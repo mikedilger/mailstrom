@@ -55,9 +55,7 @@
 //!     let mut mailstrom = Mailstrom::new(
 //!         Config {
 //!             helo_name: "my.host.domainname".to_owned(),
-//!             smtp_timeout_secs: 30,
-//!             resolver_config: Default::default(),
-//!             resolver_opts: Default::default(),
+//!             ..Default::default()
 //!         },
 //!         MemoryStorage::new());
 //!

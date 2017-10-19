@@ -9,6 +9,7 @@ pub struct Config
     pub base_resend_delay_secs: u64,
     pub resolver_config: ResolverConfig,
     pub resolver_opts: ResolverOpts,
+    pub require_tls: bool,
 }
 
 impl Default for Config {
@@ -18,7 +19,8 @@ impl Default for Config {
             smtp_timeout_secs: 60,
             base_resend_delay_secs: 60,
             resolver_config: ResolverConfig::default(),
-            resolver_opts: ResolverOpts::default()
+            resolver_opts: ResolverOpts::default(),
+            require_tls: true,
         }
     }
 }
