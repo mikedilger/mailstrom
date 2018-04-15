@@ -178,7 +178,7 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
         WorkerStatus::from_u8(self.worker_status.load(Ordering::SeqCst))
     }
 
-    /// Send an email, getting back it's message-id
+    /// Send an email, getting back its message-id
     pub fn send_email(&mut self, email: Email) -> Result<String, Error>
     {
         let (prepared_email, internal_message_status) =
