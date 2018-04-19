@@ -1,9 +1,7 @@
-NOTE: 0.4 will be released after several issues found in testing are resolved to my
-      satisfaction.
 
 # Mailstrom
 
-[Documentation](https://mikedilger.github.io/mailstrom) for 0.3.0
+[Documentation](https://docs.rs/mailstrom)
 
 `Mailstrom` is a rust library that handles email delivery for rust programs in a
 background worker thread.  It does the following:
