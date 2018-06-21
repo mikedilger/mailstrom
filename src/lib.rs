@@ -111,7 +111,7 @@ mod storage;
 
 use email_format::Email;
 use std::ops::Drop;
-use std::sync::{mpsc, Arc, Mutex, RwLock};
+use std::sync::{mpsc, Arc, RwLock};
 use std::thread;
 
 use error::Error;
@@ -122,7 +122,7 @@ use worker::{Message, Worker};
 pub struct Mailstrom<S: MailstromStorage + 'static> {
     config: Config,
     sender: mpsc::Sender<Message>,
-    worker_status: Arc<Mutex<u8>>,
+    worker_status: Arc<RwLock<u8>>,
     storage: Arc<RwLock<S>>,
 }
 
@@ -133,7 +133,7 @@ impl<S: MailstromStorage + 'static> Mailstrom<S> {
 
         let storage = Arc::new(RwLock::new(storage));
 
-        let worker_status = Arc::new(Mutex::new(WorkerStatus::Ok as u8));
+        let worker_status = Arc::new(RwLock::new(WorkerStatus::Ok as u8));
 
         let mut worker = Worker::new(
             receiver,
@@ -171,7 +171,7 @@ impl<S: MailstromStorage + 'static> Mailstrom<S> {
 
     /// Determine the status of the worker
     pub fn worker_status(&self) -> WorkerStatus {
-        let ws = *self.worker_status.lock().unwrap();
+        let ws = *self.worker_status.read().unwrap();
         WorkerStatus::from_u8(ws)
     }
 

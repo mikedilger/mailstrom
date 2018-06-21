@@ -4,7 +4,7 @@ mod task;
 
 use std::collections::BTreeSet;
 use std::sync::mpsc::{self, RecvTimeoutError};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 use trust_dns_resolver::Resolver;
@@ -58,7 +58,7 @@ impl WorkerStatus {
 pub struct Worker<S: MailstromStorage + 'static> {
     pub receiver: mpsc::Receiver<Message>,
 
-    worker_status: Arc<Mutex<u8>>,
+    worker_status: Arc<RwLock<u8>>,
 
     config: Config,
 
@@ -75,7 +75,7 @@ impl<S: MailstromStorage + 'static> Worker<S> {
     pub fn new(
         receiver: mpsc::Receiver<Message>,
         storage: Arc<RwLock<S>>,
-        worker_status: Arc<Mutex<u8>>,
+        worker_status: Arc<RwLock<u8>>,
         config: Config,
     ) -> Worker<S> {
         let mut worker = Worker {
@@ -99,10 +99,10 @@ impl<S: MailstromStorage + 'static> Worker<S> {
                     });
                 }
             } else {
-                *worker.worker_status.lock().unwrap() = WorkerStatus::StorageReadFailed as u8;
+                *worker.worker_status.write().unwrap() = WorkerStatus::StorageReadFailed as u8;
             }
         } else {
-            *worker.worker_status.lock().unwrap() = WorkerStatus::LockPoisoned as u8;
+            *worker.worker_status.write().unwrap() = WorkerStatus::LockPoisoned as u8;
         }
 
         worker
@@ -115,7 +115,7 @@ impl<S: MailstromStorage + 'static> Worker<S> {
         ) {
             Ok(resolver) => resolver,
             Err(e) => {
-                *self.worker_status.lock().unwrap() = WorkerStatus::ResolverCreationFailed as u8;
+                *self.worker_status.write().unwrap() = WorkerStatus::ResolverCreationFailed as u8;
                 info!("(worker) failed and terminated: {:?}", e);
                 return;
             }
@@ -167,14 +167,14 @@ impl<S: MailstromStorage + 'static> Worker<S> {
                     }
                     Message::Terminate => {
                         debug!("(worker) received Terminate command");
-                        *self.worker_status.lock().unwrap() = WorkerStatus::Terminated as u8;
+                        *self.worker_status.write().unwrap() = WorkerStatus::Terminated as u8;
                         info!("(worker) terminated");
                         return;
                     }
                 },
                 Err(RecvTimeoutError::Timeout) => {}
                 Err(RecvTimeoutError::Disconnected) => {
-                    *self.worker_status.lock().unwrap() = WorkerStatus::ChannelDisconnected as u8;
+                    *self.worker_status.write().unwrap() = WorkerStatus::ChannelDisconnected as u8;
                     info!("(worker) failed and terminated");
                     return;
                 }
@@ -193,7 +193,7 @@ impl<S: MailstromStorage + 'static> Worker<S> {
                 for task in &due_tasks {
                     let worker_status = self.handle_task(task, &resolver);
                     if worker_status != WorkerStatus::Ok {
-                        *self.worker_status.lock().unwrap() = worker_status as u8;
+                        *self.worker_status.write().unwrap() = worker_status as u8;
                         debug!("(worker) failed and terminated");
                         return;
                     }
