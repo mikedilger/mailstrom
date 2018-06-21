@@ -3,9 +3,8 @@ mod smtp;
 mod task;
 mod mx;
 
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, Mutex};
 use std::sync::mpsc::{self, RecvTimeoutError};
-use std::sync::atomic::{AtomicU8, Ordering};
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
@@ -61,7 +60,7 @@ pub struct Worker<S: MailstromStorage + 'static>
 {
     pub receiver: mpsc::Receiver<Message>,
 
-    worker_status: Arc<AtomicU8>,
+    worker_status: Arc<Mutex<u8>>,
 
     config: Config,
 
@@ -78,7 +77,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
 {
     pub fn new(receiver: mpsc::Receiver<Message>,
                storage: Arc<RwLock<S>>,
-               worker_status: Arc<AtomicU8>,
+               worker_status: Arc<Mutex<u8>>,
                config: Config)
                -> Worker<S>
     {
@@ -103,12 +102,11 @@ impl<S: MailstromStorage + 'static> Worker<S>
                     });
                 }
             } else {
-                worker.worker_status.store(WorkerStatus::StorageReadFailed as u8,
-                                           Ordering::SeqCst);
+                *worker.worker_status.lock().unwrap() =
+                    WorkerStatus::StorageReadFailed as u8;
             }
         } else {
-            worker.worker_status.store(WorkerStatus::LockPoisoned as u8,
-                                       Ordering::SeqCst);
+            *worker.worker_status.lock().unwrap() = WorkerStatus::LockPoisoned as u8;
         }
 
         worker
@@ -122,8 +120,8 @@ impl<S: MailstromStorage + 'static> Worker<S>
         {
             Ok(resolver) => resolver,
             Err(e) => {
-                self.worker_status.store(WorkerStatus::ResolverCreationFailed as u8,
-                                         Ordering::SeqCst);
+                *self.worker_status.lock().unwrap() =
+                    WorkerStatus::ResolverCreationFailed as u8;
                 info!("(worker) failed and terminated: {:?}", e);
                 return;
             }
@@ -173,16 +171,16 @@ impl<S: MailstromStorage + 'static> Worker<S>
                     }
                     Message::Terminate => {
                         debug!("(worker) received Terminate command");
-                        self.worker_status.store(
-                            WorkerStatus::Terminated as u8, Ordering::SeqCst);
+                        *self.worker_status.lock().unwrap() =
+                            WorkerStatus::Terminated as u8;
                         info!("(worker) terminated");
                         return;
                     },
                 },
                 Err(RecvTimeoutError::Timeout) => { },
                 Err(RecvTimeoutError::Disconnected) => {
-                    self.worker_status.store(WorkerStatus::ChannelDisconnected as u8,
-                                             Ordering::SeqCst);
+                    *self.worker_status.lock().unwrap() =
+                        WorkerStatus::ChannelDisconnected as u8;
                     info!("(worker) failed and terminated");
                     return;
                 }
@@ -198,8 +196,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
                 for task in &due_tasks {
                     let worker_status = self.handle_task(task, &resolver);
                     if worker_status != WorkerStatus::Ok {
-                        self.worker_status.store(worker_status as u8,
-                                                 Ordering::SeqCst);
+                        *self.worker_status.lock().unwrap() = worker_status as u8;
                         debug!("(worker) failed and terminated");
                         return;
                     }
