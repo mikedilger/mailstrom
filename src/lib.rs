@@ -75,8 +75,6 @@
 //! ```
 
 
-#![feature(integer_atomics)]
-
 extern crate uuid;
 extern crate email_format;
 extern crate trust_dns_resolver;
@@ -110,8 +108,7 @@ pub use prepared_email::PreparedEmail;
 
 mod storage;
 
-use std::sync::{mpsc, Arc, RwLock};
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::{mpsc, Arc, RwLock,Mutex};
 use std::thread;
 use std::ops::Drop;
 use email_format::Email;
@@ -125,8 +122,8 @@ pub struct Mailstrom<S: MailstromStorage + 'static>
 {
     config: Config,
     sender: mpsc::Sender<Message>,
-    worker_status: Arc<AtomicU8>,
     storage: Arc<RwLock<S>>,
+    worker:Arc<Mutex<Worker<S>>>,
 }
 
 impl<S: MailstromStorage + 'static> Mailstrom<S>
@@ -138,20 +135,18 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
 
         let storage = Arc::new(RwLock::new(storage));
 
-        let worker_status = Arc::new(AtomicU8::new(WorkerStatus::Ok as u8));
 
-        let mut worker = Worker::new(receiver, Arc::clone(&storage), Arc::clone(&worker_status),
-                                     config.clone());
-
+        let worker = Arc::new(Mutex::new(Worker::new(receiver, Arc::clone(&storage),config.clone())));
+		let save = worker.clone();
         let _ = thread::spawn(move|| {
-            worker.run();
+            worker.lock().expect("run worker without poisoning").run();
         });
 
         Mailstrom {
             config: config,
             sender: sender,
-            worker_status: worker_status,
             storage: storage,
+            worker :save,
         }
     }
 
@@ -175,7 +170,7 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
     /// Determine the status of the worker
     pub fn worker_status(&self) -> WorkerStatus
     {
-        WorkerStatus::from_u8(self.worker_status.load(Ordering::SeqCst))
+        self.worker.lock().expect("Get status without poisoning").worker_status()
     }
 
     /// Send an email, getting back its message-id

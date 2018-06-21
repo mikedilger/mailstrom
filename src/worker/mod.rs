@@ -5,7 +5,6 @@ mod mx;
 
 use std::sync::{Arc, RwLock};
 use std::sync::mpsc::{self, RecvTimeoutError};
-use std::sync::atomic::{AtomicU8, Ordering};
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
@@ -31,37 +30,22 @@ pub enum Message {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-#[repr(u8)]
 pub enum WorkerStatus {
-    Ok = 0,
-    Terminated = 1,
-    ChannelDisconnected = 2,
-    LockPoisoned = 3,
-    StorageWriteFailed = 4,
-    StorageReadFailed = 5,
-    ResolverCreationFailed = 6,
-    Unknown = 255,
-}
-impl WorkerStatus {
-    pub fn from_u8(value: u8) -> WorkerStatus {
-        match value {
-            0 => WorkerStatus::Ok,
-            1 => WorkerStatus::Terminated,
-            2 => WorkerStatus::ChannelDisconnected,
-            3 => WorkerStatus::LockPoisoned,
-            4 => WorkerStatus::StorageWriteFailed,
-            5 => WorkerStatus::StorageReadFailed,
-            6 => WorkerStatus::ResolverCreationFailed,
-            _ => WorkerStatus::Unknown,
-        }
-    }
+    Ok,
+    Terminated,
+    ChannelDisconnected,
+    LockPoisoned,
+    StorageWriteFailed,
+    StorageReadFailed,
+    ResolverCreationFailed,
+    Unknown,
 }
 
 pub struct Worker<S: MailstromStorage + 'static>
 {
     pub receiver: mpsc::Receiver<Message>,
 
-    worker_status: Arc<AtomicU8>,
+    worker_status: WorkerStatus,
 
     config: Config,
 
@@ -78,13 +62,12 @@ impl<S: MailstromStorage + 'static> Worker<S>
 {
     pub fn new(receiver: mpsc::Receiver<Message>,
                storage: Arc<RwLock<S>>,
-               worker_status: Arc<AtomicU8>,
                config: Config)
                -> Worker<S>
     {
         let mut worker = Worker {
             receiver: receiver,
-            worker_status: worker_status,
+            worker_status: WorkerStatus::Ok,
             config: config,
             storage: storage,
             tasks: BTreeSet::new(),
@@ -103,12 +86,10 @@ impl<S: MailstromStorage + 'static> Worker<S>
                     });
                 }
             } else {
-                worker.worker_status.store(WorkerStatus::StorageReadFailed as u8,
-                                           Ordering::SeqCst);
+                worker.worker_status = WorkerStatus::StorageReadFailed;
             }
         } else {
-            worker.worker_status.store(WorkerStatus::LockPoisoned as u8,
-                                       Ordering::SeqCst);
+            worker.worker_status = WorkerStatus::LockPoisoned;
         }
 
         worker
@@ -122,8 +103,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
         {
             Ok(resolver) => resolver,
             Err(e) => {
-                self.worker_status.store(WorkerStatus::ResolverCreationFailed as u8,
-                                         Ordering::SeqCst);
+                self.worker_status = WorkerStatus::ResolverCreationFailed;
                 info!("(worker) failed and terminated: {:?}", e);
                 return;
             }
@@ -173,16 +153,15 @@ impl<S: MailstromStorage + 'static> Worker<S>
                     }
                     Message::Terminate => {
                         debug!("(worker) received Terminate command");
-                        self.worker_status.store(
-                            WorkerStatus::Terminated as u8, Ordering::SeqCst);
+                        self.worker_status = 
+                            WorkerStatus::Terminated;
                         info!("(worker) terminated");
                         return;
                     },
                 },
                 Err(RecvTimeoutError::Timeout) => { },
                 Err(RecvTimeoutError::Disconnected) => {
-                    self.worker_status.store(WorkerStatus::ChannelDisconnected as u8,
-                                             Ordering::SeqCst);
+                    self.worker_status = WorkerStatus::ChannelDisconnected;
                     info!("(worker) failed and terminated");
                     return;
                 }
@@ -198,8 +177,7 @@ impl<S: MailstromStorage + 'static> Worker<S>
                 for task in &due_tasks {
                     let worker_status = self.handle_task(task, &resolver);
                     if worker_status != WorkerStatus::Ok {
-                        self.worker_status.store(worker_status as u8,
-                                                 Ordering::SeqCst);
+                        self.worker_status = worker_status;
                         debug!("(worker) failed and terminated");
                         return;
                     }
@@ -322,6 +300,10 @@ impl<S: MailstromStorage + 'static> Worker<S>
 
         WorkerStatus::Ok
     }
+    
+    pub fn worker_status(&self) -> WorkerStatus {
+		self.worker_status.clone()
+	}
 }
 
 struct MxDelivery {
