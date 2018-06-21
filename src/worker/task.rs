@@ -1,5 +1,5 @@
+use std::cmp::{Ord, Ordering, PartialEq, PartialOrd};
 use std::time::Instant;
-use std::cmp::{Ord, Ordering, PartialOrd, PartialEq};
 
 #[derive(Debug, Clone, Copy)]
 pub enum TaskType {
@@ -31,4 +31,4 @@ impl PartialEq for Task {
     }
 }
 
-impl Eq for Task { }
+impl Eq for Task {}

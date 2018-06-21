@@ -1,13 +1,12 @@
-
-use uuid::Uuid;
-use lettre::{SendableEmail, EmailAddress};
-use email_format::Email;
-use email_format::rfc5322::types::{Address, GroupList, Mailbox};
+use delivery_result::DeliveryResult;
 use email_format::rfc5322::headers::Bcc;
+use email_format::rfc5322::types::{Address, GroupList, Mailbox};
+use email_format::Email;
 use error::Error;
+use lettre::{EmailAddress, SendableEmail};
 use message_status::InternalMessageStatus;
 use recipient_status::InternalRecipientStatus;
-use delivery_result::DeliveryResult;
+use uuid::Uuid;
 
 /// An email, prepared for delivery.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -18,9 +17,10 @@ pub struct PreparedEmail {
     pub message: Vec<u8>,
 }
 
-pub fn prepare_email(mut email: Email, helo_name: &str)
-                     -> Result< (PreparedEmail, InternalMessageStatus), Error>
-{
+pub fn prepare_email(
+    mut email: Email,
+    helo_name: &str,
+) -> Result<(PreparedEmail, InternalMessageStatus), Error> {
     let recipients = determine_recipients(&email);
 
     // Blind the Bcc
@@ -30,17 +30,17 @@ pub fn prepare_email(mut email: Email, helo_name: &str)
         Some(mid) => format!("{}@{}", mid.0.id_left, mid.0.id_right),
         None => {
             // Generate message-id
-            let message_id = format!(
-                "{}@{}",
-                Uuid::new_v4().hyphenated().to_string(),
-                helo_name);
+            let message_id = format!("{}@{}", Uuid::new_v4().hyphenated().to_string(), helo_name);
             email.set_message_id(&*format!("<{}>", message_id))?;
             message_id
         }
     };
 
     let prepared_email = PreparedEmail {
-        to: recipients.iter().map(|r| r.smtp_email_addr.clone()).collect(),
+        to: recipients
+            .iter()
+            .map(|r| r.smtp_email_addr.clone())
+            .collect(),
         from: format!("{}", email.get_from().0),
         message_id: message_id.clone(),
         message: format!("{}", email).into_bytes(),
@@ -52,11 +52,10 @@ pub fn prepare_email(mut email: Email, helo_name: &str)
         attempts_remaining: 3,
     };
 
-    Ok( (prepared_email, internal_message_status) )
+    Ok((prepared_email, internal_message_status))
 }
 
-fn determine_recipients(email: &Email) -> Vec<InternalRecipientStatus>
-{
+fn determine_recipients(email: &Email) -> Vec<InternalRecipientStatus> {
     let mut addresses: Vec<Address> = Vec::new();
 
     if let Some(to) = email.get_to() {
@@ -79,7 +78,7 @@ fn determine_recipients(email: &Email) -> Vec<InternalRecipientStatus>
         match address {
             Address::Mailbox(mb) => {
                 recipients.push(recipient_from_mailbox(mb));
-            },
+            }
             Address::Group(grp) => {
                 if let Some(gl) = grp.group_list {
                     match gl {
@@ -87,26 +86,29 @@ fn determine_recipients(email: &Email) -> Vec<InternalRecipientStatus>
                             for mb in mbl.0 {
                                 recipients.push(recipient_from_mailbox(mb));
                             }
-                        },
+                        }
                         GroupList::CFWS(_) => continue,
                     }
                 }
-            },
+            }
         }
     }
 
     recipients
 }
 
-fn recipient_from_mailbox(mb: Mailbox) -> InternalRecipientStatus
-{
+fn recipient_from_mailbox(mb: Mailbox) -> InternalRecipientStatus {
     let (email_addr, smtp_email_addr, domain) = match mb {
-        Mailbox::NameAddr(na) => (format!("{}", na),
-                                  format!("{}", na.angle_addr.addr_spec),
-                                  format!("{}", na.angle_addr.addr_spec.domain)),
-        Mailbox::AddrSpec(ads) => (format!("{}", ads),
-                                   format!("{}", ads),
-                                   format!("{}", ads.domain)),
+        Mailbox::NameAddr(na) => (
+            format!("{}", na),
+            format!("{}", na.angle_addr.addr_spec),
+            format!("{}", na.angle_addr.addr_spec.domain),
+        ),
+        Mailbox::AddrSpec(ads) => (
+            format!("{}", ads),
+            format!("{}", ads),
+            format!("{}", ads.domain),
+        ),
     };
 
     InternalRecipientStatus {
@@ -121,7 +123,10 @@ fn recipient_from_mailbox(mb: Mailbox) -> InternalRecipientStatus
 
 impl<'a> SendableEmail<'a, &'a [u8]> for PreparedEmail {
     fn to(&self) -> Vec<EmailAddress> {
-        self.to.iter().map(|s| EmailAddress::new(s.clone())).collect()
+        self.to
+            .iter()
+            .map(|s| EmailAddress::new(s.clone()))
+            .collect()
     }
     fn from(&self) -> EmailAddress {
         EmailAddress::new(self.from.clone())

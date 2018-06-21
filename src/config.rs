@@ -1,9 +1,7 @@
-
 use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
 
 #[derive(Clone)]
-pub struct Config
-{
+pub struct Config {
     pub helo_name: String,
     pub smtp_timeout_secs: u64,
     pub base_resend_delay_secs: u64,

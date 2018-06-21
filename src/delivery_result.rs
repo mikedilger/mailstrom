@@ -1,4 +1,3 @@
-
 /// The result (so far) of the sending of an email to a particular recipient
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum DeliveryResult {
@@ -20,8 +19,8 @@ pub enum DeliveryResult {
 impl DeliveryResult {
     pub fn completed(&self) -> bool {
         match *self {
-            DeliveryResult::Queued | DeliveryResult::Deferred(_,_) => false,
-            _ => true
+            DeliveryResult::Queued | DeliveryResult::Deferred(_, _) => false,
+            _ => true,
         }
     }
 }

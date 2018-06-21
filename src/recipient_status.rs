@@ -1,4 +1,3 @@
-
 use delivery_result::DeliveryResult;
 
 /// Per-Recipient Delivery Information

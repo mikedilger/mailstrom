@@ -1,21 +1,20 @@
-
+mod mx;
 mod smtp;
 mod task;
-mod mx;
 
-use std::sync::{Arc, RwLock, Mutex};
-use std::sync::mpsc::{self, RecvTimeoutError};
 use std::collections::BTreeSet;
+use std::sync::mpsc::{self, RecvTimeoutError};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 use trust_dns_resolver::Resolver;
 
-use prepared_email::PreparedEmail;
-use message_status::InternalMessageStatus;
-use delivery_result::DeliveryResult;
-use storage::MailstromStorage;
 use self::task::{Task, TaskType};
-use ::Config;
+use delivery_result::DeliveryResult;
+use message_status::InternalMessageStatus;
+use prepared_email::PreparedEmail;
+use storage::MailstromStorage;
+use Config;
 
 const LOOP_DELAY: u64 = 10;
 
@@ -56,8 +55,7 @@ impl WorkerStatus {
     }
 }
 
-pub struct Worker<S: MailstromStorage + 'static>
-{
+pub struct Worker<S: MailstromStorage + 'static> {
     pub receiver: mpsc::Receiver<Message>,
 
     worker_status: Arc<Mutex<u8>>,
@@ -73,14 +71,13 @@ pub struct Worker<S: MailstromStorage + 'static>
     paused: bool,
 }
 
-impl<S: MailstromStorage + 'static> Worker<S>
-{
-    pub fn new(receiver: mpsc::Receiver<Message>,
-               storage: Arc<RwLock<S>>,
-               worker_status: Arc<Mutex<u8>>,
-               config: Config)
-               -> Worker<S>
-    {
+impl<S: MailstromStorage + 'static> Worker<S> {
+    pub fn new(
+        receiver: mpsc::Receiver<Message>,
+        storage: Arc<RwLock<S>>,
+        worker_status: Arc<Mutex<u8>>,
+        config: Config,
+    ) -> Worker<S> {
         let mut worker = Worker {
             receiver: receiver,
             worker_status: worker_status,
@@ -95,15 +92,14 @@ impl<S: MailstromStorage + 'static> Worker<S>
             if let Ok(mut isvec) = (*guard).retrieve_all_incomplete() {
                 // Create one task for each queued/deferred email
                 for is in isvec.drain(..) {
-                    worker.tasks.insert( Task {
+                    worker.tasks.insert(Task {
                         tasktype: TaskType::Resend,
                         time: Instant::now(),
                         message_id: is.message_id.clone(),
                     });
                 }
             } else {
-                *worker.worker_status.lock().unwrap() =
-                    WorkerStatus::StorageReadFailed as u8;
+                *worker.worker_status.lock().unwrap() = WorkerStatus::StorageReadFailed as u8;
             }
         } else {
             *worker.worker_status.lock().unwrap() = WorkerStatus::LockPoisoned as u8;
@@ -113,15 +109,13 @@ impl<S: MailstromStorage + 'static> Worker<S>
     }
 
     pub fn run(&mut self) {
-
         let resolver: Resolver = match Resolver::new(
             self.config.resolver_config.clone(),
-            self.config.resolver_opts)
-        {
+            self.config.resolver_opts,
+        ) {
             Ok(resolver) => resolver,
             Err(e) => {
-                *self.worker_status.lock().unwrap() =
-                    WorkerStatus::ResolverCreationFailed as u8;
+                *self.worker_status.lock().unwrap() = WorkerStatus::ResolverCreationFailed as u8;
                 info!("(worker) failed and terminated: {:?}", e);
                 return;
             }
@@ -135,21 +129,23 @@ impl<S: MailstromStorage + 'static> Worker<S>
             let timeout: Duration = if self.paused {
                 debug!("(worker) loop start (paused)");
                 Duration::from_secs(LOOP_DELAY)
-            }
-            else if let Some(task) = self.tasks.iter().next() {
+            } else if let Some(task) = self.tasks.iter().next() {
                 debug!("(worker) loop start (tasks in queue)");
                 let now = Instant::now();
                 if task.time > now {
                     task.time - now
                 } else {
-                    Duration::new(0,0) // overdue!
+                    Duration::new(0, 0) // overdue!
                 }
             } else {
                 debug!("(worker) loop start (no tasks)");
                 Duration::from_secs(LOOP_DELAY)
             };
 
-            debug!("(worker) waiting for a message ({} seconds)", timeout.as_secs());
+            debug!(
+                "(worker) waiting for a message ({} seconds)",
+                timeout.as_secs()
+            );
 
             // Receive a message.  Waiting at most until the time when the next task
             // is due, or LOOP_DELAY seconds if there are no tasks
@@ -158,12 +154,12 @@ impl<S: MailstromStorage + 'static> Worker<S>
                     Message::Start => {
                         trace!("(worker) starting");
                         self.paused = false;
-                    },
+                    }
                     Message::SendEmail(message_id) => {
                         debug!("(worker) received SendEmail command");
                         // Create a task (don't do it right away) so we can more easily
                         // code pause-continue logic and eventually multiple worker threads
-                        self.tasks.insert( Task {
+                        self.tasks.insert(Task {
                             tasktype: TaskType::Resend,
                             time: Instant::now(),
                             message_id: message_id,
@@ -171,26 +167,27 @@ impl<S: MailstromStorage + 'static> Worker<S>
                     }
                     Message::Terminate => {
                         debug!("(worker) received Terminate command");
-                        *self.worker_status.lock().unwrap() =
-                            WorkerStatus::Terminated as u8;
+                        *self.worker_status.lock().unwrap() = WorkerStatus::Terminated as u8;
                         info!("(worker) terminated");
                         return;
-                    },
+                    }
                 },
-                Err(RecvTimeoutError::Timeout) => { },
+                Err(RecvTimeoutError::Timeout) => {}
                 Err(RecvTimeoutError::Disconnected) => {
-                    *self.worker_status.lock().unwrap() =
-                        WorkerStatus::ChannelDisconnected as u8;
+                    *self.worker_status.lock().unwrap() = WorkerStatus::ChannelDisconnected as u8;
                     info!("(worker) failed and terminated");
                     return;
                 }
             };
 
-            if ! self.paused {
+            if !self.paused {
                 // Copy out all the tasks that are due
                 let now = Instant::now();
-                let due_tasks: Vec<Task> = self.tasks.iter()
-                    .filter(|t| now > t.time).cloned().collect();
+                let due_tasks: Vec<Task> = self.tasks
+                    .iter()
+                    .filter(|t| now > t.time)
+                    .cloned()
+                    .collect();
 
                 // Handle all these due tasks
                 for task in &due_tasks {
@@ -218,33 +215,32 @@ impl<S: MailstromStorage + 'static> Worker<S>
                     match (*guard).retrieve(&*task.message_id) {
                         Err(e) => {
                             warn!("Unable to retrieve task: {:?}", e);
-                            return WorkerStatus::Ok
-                        },
-                        Ok(x) => x
+                            return WorkerStatus::Ok;
+                        }
+                        Ok(x) => x,
                     }
                 };
                 self.send_email(email, internal_message_status, resolver)
-            },
+            }
         }
     }
 
-    fn send_email(&mut self,
-                  email: PreparedEmail,
-                  mut internal_message_status: InternalMessageStatus,
-                  resolver: &Resolver)
-                  -> WorkerStatus
-    {
+    fn send_email(
+        &mut self,
+        email: PreparedEmail,
+        mut internal_message_status: InternalMessageStatus,
+        resolver: &Resolver,
+    ) -> WorkerStatus {
         let mut need_mx: bool = false;
         for recipient in &internal_message_status.recipients {
             if recipient.mx_servers.is_none() {
-                need_mx=true;
+                need_mx = true;
                 break;
             }
         }
 
         if need_mx {
-            ::worker::mx::get_mx_records_for_email(&mut internal_message_status,
-                                                   resolver);
+            ::worker::mx::get_mx_records_for_email(&mut internal_message_status, resolver);
 
             // Update storage with this MX information
             let status = self.update_status(&internal_message_status);
@@ -261,9 +257,11 @@ impl<S: MailstromStorage + 'static> Worker<S>
                     data = Some((attempts, msg.clone()));
                 }
                 if data.is_some() {
-                    let (attempts,msg) = data.unwrap();
-                    recipient.result = DeliveryResult::Failed(
-                        format!("Too many attempts ({}): {}", attempts, msg));
+                    let (attempts, msg) = data.unwrap();
+                    recipient.result = DeliveryResult::Failed(format!(
+                        "Too many attempts ({}): {}",
+                        attempts, msg
+                    ));
                 }
             }
         }
@@ -284,13 +282,17 @@ impl<S: MailstromStorage + 'static> Worker<S>
         if internal_message_status.attempts_remaining > 0 {
             let attempt = 3 - internal_message_status.attempts_remaining;
             // exponential backoff
-            let delay = Duration::from_secs(self.config.base_resend_delay_secs
-                                            * 3u64.pow(u32::from(attempt)));
-            trace!("Queueing task to retry {} in {} seconds",
-                   &internal_message_status.message_id, delay.as_secs());
+            let delay = Duration::from_secs(
+                self.config.base_resend_delay_secs * 3u64.pow(u32::from(attempt)),
+            );
+            trace!(
+                "Queueing task to retry {} in {} seconds",
+                &internal_message_status.message_id,
+                delay.as_secs()
+            );
 
             // Create a new worker task to retry later
-            self.tasks.insert( Task {
+            self.tasks.insert(Task {
                 tasktype: TaskType::Resend,
                 time: Instant::now() + delay,
                 message_id: internal_message_status.message_id.clone(),
@@ -300,16 +302,14 @@ impl<S: MailstromStorage + 'static> Worker<S>
         WorkerStatus::Ok
     }
 
-    fn update_status(&mut self, internal_message_status: &InternalMessageStatus)
-       -> WorkerStatus
-    {
+    fn update_status(&mut self, internal_message_status: &InternalMessageStatus) -> WorkerStatus {
         // Lock the storage
         let mut guard = match (*self.storage).write() {
             Ok(guard) => guard,
             Err(e) => {
                 error!("{:?}", e);
                 return WorkerStatus::LockPoisoned;
-            },
+            }
         };
 
         if let Err(e) = (*guard).update_status(internal_message_status.clone()) {
@@ -322,15 +322,17 @@ impl<S: MailstromStorage + 'static> Worker<S>
 }
 
 struct MxDelivery {
-    mx_server: String, // domain name
-    recipients: Vec<usize> // index into InternalMessageStatus.recipients
+    mx_server: String,      // domain name
+    recipients: Vec<usize>, // index into InternalMessageStatus.recipients
 }
 
 // Organize delivery for one-SMTP-delivery per MX server, and then use smtp_deliver()
 // Returns true only if all recipient deliveries have been completed (rather than deferred)
-fn deliver(email: &PreparedEmail, internal_message_status: &mut InternalMessageStatus,
-           config: &Config) -> bool
-{
+fn deliver(
+    email: &PreparedEmail,
+    internal_message_status: &mut InternalMessageStatus,
+    config: &Config,
+) -> bool {
     let mut deferred_some: bool = false;
 
     // We will sort our deliver plans by MX server. Currently they are sorted
@@ -338,7 +340,6 @@ fn deliver(email: &PreparedEmail, internal_message_status: &mut InternalMessageS
     let mut mx_delivery: Vec<MxDelivery> = Vec::new();
 
     for r_index in 0..internal_message_status.recipients.len() {
-
         let recip = &mut internal_message_status.recipients[r_index];
 
         // Skip this recipient if already completed
@@ -358,8 +359,7 @@ fn deliver(email: &PreparedEmail, internal_message_status: &mut InternalMessageS
             // across multiple MX servers)
             if attempts >= 5 {
                 debug!("(worker) delivery failed after 5 attempts.");
-                recip.result = DeliveryResult::Failed(
-                    format!("Failed after 5 attempts: {}", msg));
+                recip.result = DeliveryResult::Failed(format!("Failed after 5 attempts: {}", msg));
                 continue;
             }
         }
@@ -367,8 +367,7 @@ fn deliver(email: &PreparedEmail, internal_message_status: &mut InternalMessageS
         // Skip (and complete) if no MX servers
         if recip.mx_servers.is_none() {
             debug!("(worker) delivery failed (no valid MX records).");
-            recip.result = DeliveryResult::Failed(
-                "MX records found but none are valid".to_owned());
+            recip.result = DeliveryResult::Failed("MX records found but none are valid".to_owned());
             continue;
         }
 
@@ -378,38 +377,41 @@ fn deliver(email: &PreparedEmail, internal_message_status: &mut InternalMessageS
         // Add to our MxDelivery vector
         for item in mx_servers.iter().skip(recip.current_mx) {
             // Find the index of the MX server in our mx_delivery array
-            let maybe_position = mx_delivery.iter().position(
-                |mxd| mxd.mx_server == *item);
+            let maybe_position = mx_delivery.iter().position(|mxd| mxd.mx_server == *item);
             match maybe_position {
                 None => {
                     // Add this new MX server with the current recipient
                     mx_delivery.push(MxDelivery {
                         mx_server: item.clone(),
-                        recipients: vec![ r_index ],
+                        recipients: vec![r_index],
                     });
-                },
+                }
                 Some(index) => {
                     // Add this recipient to the mx_delivery
-                    mx_delivery[index].recipients.push( r_index );
-                },
+                    mx_delivery[index].recipients.push(r_index);
+                }
             }
         }
     }
 
     // Deliver on a per-mx basis
     for mxd in &mut mx_delivery {
-
         // Per-MX version of the prepared email
         let mut mx_prepared_email = email.clone();
 
         // Rebuild the 'To:' list; only add recipients for *this* MX server,
         // and for which delivery has not already completed
-        mx_prepared_email.to = mxd.recipients.iter()
+        mx_prepared_email.to = mxd.recipients
+            .iter()
             .filter_map(|r| {
                 if internal_message_status.recipients[*r].result.completed() {
                     None
                 } else {
-                    Some(internal_message_status.recipients[*r].smtp_email_addr.clone())
+                    Some(
+                        internal_message_status.recipients[*r]
+                            .smtp_email_addr
+                            .clone(),
+                    )
                 }
             })
             .collect();
@@ -423,24 +425,23 @@ fn deliver(email: &PreparedEmail, internal_message_status: &mut InternalMessageS
 
         // Actually deliver to this SMTP server
         // (we set attempt=1 but this gets replaced per recipient below)
-        let result = ::worker::smtp::smtp_delivery(
-            &mx_prepared_email, &*mxd.mx_server, config, 1);
+        let result = ::worker::smtp::smtp_delivery(&mx_prepared_email, &*mxd.mx_server, config, 1);
 
         for r in &mxd.recipients {
-
             // If the result is deferred, and the previous result was deferred, then
             // bump the attempt number and update the reason message
             if let DeliveryResult::Deferred(_, ref newmsg) = result {
                 deferred_some = true;
                 let mut data: Option<u8> = None;
-                if let DeliveryResult::Deferred(attempts, _) = internal_message_status.recipients[*r].result
+                if let DeliveryResult::Deferred(attempts, _) =
+                    internal_message_status.recipients[*r].result
                 {
                     data = Some(attempts);
                 }
                 if data.is_some() {
                     let attempts = data.unwrap();
-                    internal_message_status.recipients[*r].result = DeliveryResult::Deferred(
-                        attempts + 1, newmsg.clone());
+                    internal_message_status.recipients[*r].result =
+                        DeliveryResult::Deferred(attempts + 1, newmsg.clone());
                     continue;
                 }
             }
@@ -448,14 +449,12 @@ fn deliver(email: &PreparedEmail, internal_message_status: &mut InternalMessageS
             // For everyone else, just take the result
             internal_message_status.recipients[*r].result = result.clone();
         }
-
     }
 
     !deferred_some
 }
 
-pub fn is_ip(s: &str) -> bool
-{
+pub fn is_ip(s: &str) -> bool {
     if let Some(last) = s.chars().rev().next() {
         last.is_digit(10)
     } else {

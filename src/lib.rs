@@ -74,12 +74,14 @@
 //! }
 //! ```
 
-extern crate uuid;
 extern crate email_format;
-extern crate trust_dns_resolver;
 extern crate lettre;
-#[macro_use] extern crate log;
-#[macro_use] extern crate serde_derive;
+extern crate trust_dns_resolver;
+extern crate uuid;
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate serde_derive;
 extern crate native_tls;
 
 #[cfg(test)]
@@ -107,39 +109,40 @@ pub use prepared_email::PreparedEmail;
 
 mod storage;
 
+use email_format::Email;
+use std::ops::Drop;
 use std::sync::{mpsc, Arc, Mutex, RwLock};
 use std::thread;
-use std::ops::Drop;
-use email_format::Email;
 
-use worker::{Worker, Message};
 use error::Error;
 pub use message_status::InternalMessageStatus;
 pub use storage::{MailstromStorage, MailstromStorageError, MemoryStorage};
+use worker::{Message, Worker};
 
-pub struct Mailstrom<S: MailstromStorage + 'static>
-{
+pub struct Mailstrom<S: MailstromStorage + 'static> {
     config: Config,
     sender: mpsc::Sender<Message>,
     worker_status: Arc<Mutex<u8>>,
     storage: Arc<RwLock<S>>,
 }
 
-impl<S: MailstromStorage + 'static> Mailstrom<S>
-{
+impl<S: MailstromStorage + 'static> Mailstrom<S> {
     /// Create a new Mailstrom instance for sending emails.
-    pub fn new(config: Config, storage: S) -> Mailstrom<S>
-    {
+    pub fn new(config: Config, storage: S) -> Mailstrom<S> {
         let (sender, receiver) = mpsc::channel();
 
         let storage = Arc::new(RwLock::new(storage));
 
         let worker_status = Arc::new(Mutex::new(WorkerStatus::Ok as u8));
 
-        let mut worker = Worker::new(receiver, Arc::clone(&storage), Arc::clone(&worker_status),
-                                     config.clone());
+        let mut worker = Worker::new(
+            receiver,
+            Arc::clone(&storage),
+            Arc::clone(&worker_status),
+            config.clone(),
+        );
 
-        let _ = thread::spawn(move|| {
+        let _ = thread::spawn(move || {
             worker.run();
         });
 
@@ -154,30 +157,26 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
     /// Mailstrom requires an explicit start command to start sending emails.  This is
     /// because some clients are only interested in reading the status of sent emails,
     /// and will terminate before any real sending can be accomplished.
-    pub fn start(&mut self) -> Result<(), Error>
-    {
+    pub fn start(&mut self) -> Result<(), Error> {
         try!(self.sender.send(Message::Start));
         Ok(())
     }
 
     /// Ask Mailstrom to die.  This is not required, you can simply let it fall out
     /// of scope and it will clean itself up.
-    pub fn die(&mut self) -> Result<(), Error>
-    {
+    pub fn die(&mut self) -> Result<(), Error> {
         try!(self.sender.send(Message::Terminate));
         Ok(())
     }
 
     /// Determine the status of the worker
-    pub fn worker_status(&self) -> WorkerStatus
-    {
+    pub fn worker_status(&self) -> WorkerStatus {
         let ws = *self.worker_status.lock().unwrap();
         WorkerStatus::from_u8(ws)
     }
 
     /// Send an email, getting back its message-id
-    pub fn send_email(&mut self, email: Email) -> Result<String, Error>
-    {
+    pub fn send_email(&mut self, email: Email) -> Result<String, Error> {
         let (prepared_email, internal_message_status) =
             ::prepared_email::prepare_email(email, &*self.config.helo_name)?;
 
@@ -202,8 +201,7 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
     }
 
     // Query Status of email
-    pub fn query_status(&mut self, message_id: &str) -> Result<MessageStatus, Error>
-    {
+    pub fn query_status(&mut self, message_id: &str) -> Result<MessageStatus, Error> {
         let guard = match (*self.storage).read() {
             Ok(guard) => guard,
             Err(_) => return Err(Error::Lock),
@@ -217,8 +215,7 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
     // Query recently queued and sent emails. This includes all emails where sending is not
     // yet complete, and also all emails where sending is complete but for which they have
     // not yet been reported on (via this function).
-    pub fn query_recent(&mut self) -> Result<Vec<MessageStatus>, Error>
-    {
+    pub fn query_recent(&mut self) -> Result<Vec<MessageStatus>, Error> {
         let mut guard = match (*self.storage).write() {
             Ok(guard) => guard,
             Err(_) => return Err(Error::Lock),
@@ -229,8 +226,7 @@ impl<S: MailstromStorage + 'static> Mailstrom<S>
     }
 }
 
-impl<S: MailstromStorage + 'static> Drop for Mailstrom<S>
-{
+impl<S: MailstromStorage + 'static> Drop for Mailstrom<S> {
     fn drop(&mut self) {
         info!("Mailstrom is terminating.");
         let _ = self.sender.send(Message::Terminate);

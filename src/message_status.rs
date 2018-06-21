@@ -1,6 +1,5 @@
-
-use recipient_status::{InternalRecipientStatus, RecipientStatus};
 use delivery_result::DeliveryResult;
+use recipient_status::{InternalRecipientStatus, RecipientStatus};
 
 /// An email to be sent (internal format).  This is exposed publicly for
 /// implementers of `MailstromStorage` but otherwise should not
@@ -24,16 +23,17 @@ pub struct InternalMessageStatus {
     pub attempts_remaining: u8,
 }
 
-impl InternalMessageStatus
-{
-    pub fn as_message_status(&self) -> MessageStatus
-    {
+impl InternalMessageStatus {
+    pub fn as_message_status(&self) -> MessageStatus {
         MessageStatus {
             message_id: self.message_id.clone(),
-            recipient_status: self.recipients.iter().map(|r| RecipientStatus {
-                recipient: r.email_addr.clone(),
-                result: r.result.clone(),
-            }).collect(),
+            recipient_status: self.recipients
+                .iter()
+                .map(|r| RecipientStatus {
+                    recipient: r.email_addr.clone(),
+                    result: r.result.clone(),
+                })
+                .collect(),
         }
     }
 }
@@ -45,20 +45,14 @@ pub struct MessageStatus {
 }
 
 impl MessageStatus {
-    pub fn succeeded(&self) -> bool
-    {
-        self.recipient_status.iter().all(|r| {
-            match r.result {
-                DeliveryResult::Delivered(_) => true,
-                _ => false
-            }
+    pub fn succeeded(&self) -> bool {
+        self.recipient_status.iter().all(|r| match r.result {
+            DeliveryResult::Delivered(_) => true,
+            _ => false,
         })
     }
 
-    pub fn completed(&self) -> bool
-    {
-        self.recipient_status.iter().all(|r| {
-            r.result.completed()
-        })
+    pub fn completed(&self) -> bool {
+        self.recipient_status.iter().all(|r| r.result.completed())
     }
 }

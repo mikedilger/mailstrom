@@ -1,11 +1,10 @@
-
 pub mod memory_storage;
 pub use self::memory_storage::MemoryStorage;
 
-use prepared_email::PreparedEmail;
 use message_status::InternalMessageStatus;
+use prepared_email::PreparedEmail;
 
-pub trait MailstromStorageError: ::std::error::Error { }
+pub trait MailstromStorageError: ::std::error::Error {}
 
 /// A trait for implementing Mailstrom storage
 pub trait MailstromStorage: Send + Sync {
@@ -13,16 +12,23 @@ pub trait MailstromStorage: Send + Sync {
 
     /// Store a `PreparedEmail`.  This should overwrite if message-id matches an existing
     /// email.
-    fn store(&mut self, email: PreparedEmail, internal_message_status: InternalMessageStatus)
-             -> Result<(), Self::Error>;
+    fn store(
+        &mut self,
+        email: PreparedEmail,
+        internal_message_status: InternalMessageStatus,
+    ) -> Result<(), Self::Error>;
 
     /// Update the status of an email
-    fn update_status(&mut self, internal_message_status: InternalMessageStatus)
-             -> Result<(), Self::Error>;
+    fn update_status(
+        &mut self,
+        internal_message_status: InternalMessageStatus,
+    ) -> Result<(), Self::Error>;
 
     /// Retrieve a `PreparedEmail` and `InternalMessageStatus` based on the message_id
-    fn retrieve(&self, message_id: &str)
-                -> Result<(PreparedEmail, InternalMessageStatus), Self::Error>;
+    fn retrieve(
+        &self,
+        message_id: &str,
+    ) -> Result<(PreparedEmail, InternalMessageStatus), Self::Error>;
 
     /// Retrieve an `InternalMessageStatus` based on the message_id
     fn retrieve_status(&self, message_id: &str) -> Result<InternalMessageStatus, Self::Error>;
