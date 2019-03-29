@@ -59,6 +59,6 @@ fn get_mx_records_for_domain(domain: &str, resolver: &Resolver) -> Vec<String> {
 
     records
         .into_iter()
-        .map(|(_, exch)| exch.trim_right_matches(|c| c == '.').to_owned())
+        .map(|(_, exch)| exch.trim_end_matches(|c| c == '.').to_owned())
         .collect()
 }
