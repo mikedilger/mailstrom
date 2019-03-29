@@ -76,6 +76,7 @@
 
 extern crate email_format;
 extern crate lettre;
+extern crate failure;
 extern crate trust_dns_resolver;
 extern crate uuid;
 #[macro_use]

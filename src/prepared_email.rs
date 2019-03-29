@@ -3,7 +3,7 @@ use email_format::rfc5322::headers::Bcc;
 use email_format::rfc5322::types::{Address, GroupList, Mailbox};
 use email_format::Email;
 use error::Error;
-use lettre::{EmailAddress, SendableEmail};
+use lettre::{EmailAddress, SendableEmail, Envelope};
 use message_status::InternalMessageStatus;
 use recipient_status::InternalRecipientStatus;
 use uuid::Uuid;
@@ -15,6 +15,22 @@ pub struct PreparedEmail {
     pub from: String,
     pub message_id: String,
     pub message: Vec<u8>,
+}
+
+impl PreparedEmail {
+    pub fn as_sendable_email(&self) -> Result<SendableEmail, failure::Error> {
+        let to: Result<Vec<EmailAddress>, failure::Error> =
+            self.to.iter().map(|s| EmailAddress::new(s.clone())).collect();
+        let to = to?;
+
+        Ok(SendableEmail::new(
+            Envelope::new(
+                Some(EmailAddress::new(self.from.clone())?),
+                to)?,
+            self.message_id.clone(),
+            self.message.clone()
+        ))
+    }
 }
 
 pub fn prepare_email(
@@ -45,6 +61,12 @@ pub fn prepare_email(
         message_id: message_id.clone(),
         message: format!("{}", email).into_bytes(),
     };
+
+    // Verify that lettre::SendableEmail will not give us errors later on
+    // down the track
+    let _ = ::lettre::EmailAddress::new(prepared_email.from.clone())?;
+    prepared_email.to.iter()
+        .try_for_each(|s| ::lettre::EmailAddress::new(s.clone()).map(|_|()))?;
 
     let internal_message_status = InternalMessageStatus {
         message_id: message_id,
@@ -118,23 +140,5 @@ fn recipient_from_mailbox(mb: Mailbox) -> InternalRecipientStatus {
         mx_servers: None, // To be determined later by a worker task
         current_mx: 0,
         result: DeliveryResult::Queued,
-    }
-}
-
-impl<'a> SendableEmail<'a, &'a [u8]> for PreparedEmail {
-    fn to(&self) -> Vec<EmailAddress> {
-        self.to
-            .iter()
-            .map(|s| EmailAddress::new(s.clone()))
-            .collect()
-    }
-    fn from(&self) -> EmailAddress {
-        EmailAddress::new(self.from.clone())
-    }
-    fn message_id(&self) -> String {
-        self.message_id.clone()
-    }
-    fn message(&'a self) -> Box<&'a [u8]> {
-        Box::new(&*self.message)
     }
 }

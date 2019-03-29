@@ -4,6 +4,7 @@ use std::io::Error as IoError;
 use std::sync::mpsc::SendError;
 use storage::MailstromStorageError;
 use worker::Message;
+use failure;
 
 #[derive(Debug)]
 pub enum Error {
@@ -14,6 +15,7 @@ pub enum Error {
     DnsUnavailable,
     Lock,
     Io(IoError),
+    LettreEmailAddress(failure::Error),
 }
 
 impl From<SendError<Message>> for Error {
@@ -46,6 +48,12 @@ impl From<IoError> for Error {
     }
 }
 
+impl From<failure::Error> for Error {
+    fn from(f: failure::Error) -> Error {
+        Error::LettreEmailAddress(f)
+    }
+}
+
 impl ::std::fmt::Display for Error {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         use std::error::Error as StdError;
@@ -55,6 +63,7 @@ impl ::std::fmt::Display for Error {
             Error::EmailParser(ref e) => format!("{}: {:?}", self.description(), e).fmt(f),
             Error::General(ref e) => format!("{}: {}", self.description(), e).fmt(f),
             Error::Storage(ref s) => format!("{}: {}", self.description(), s).fmt(f),
+            Error::LettreEmailAddress(ref e) => format!("{}: {}", self.description(), e).fmt(f),
             _ => format!("{}", self.description()).fmt(f),
         }
     }
@@ -70,6 +79,7 @@ impl ::std::error::Error for Error {
             Error::DnsUnavailable => "DNS unavailable",
             Error::Lock => "Lock poisoned",
             Error::Io(_) => "I/O error",
+            Error::LettreEmailAddress(_) => "Lettre crate Email Address error",
         }
     }
 

@@ -1,11 +1,11 @@
 use delivery_result::DeliveryResult;
-use lettre::smtp::client::net::{ClientTlsParameters, DEFAULT_TLS_PROTOCOLS};
+use lettre::smtp::client::net::ClientTlsParameters;
 use lettre::smtp::error::Error as LettreSmtpError;
 use lettre::smtp::extension::ClientId;
 use lettre::smtp::response::Severity;
-use lettre::smtp::{ClientSecurity, SmtpTransportBuilder};
-use lettre::EmailTransport;
-use native_tls::TlsConnector;
+use lettre::smtp::{ClientSecurity, SmtpClient};
+use lettre::Transport;
+use native_tls::{TlsConnector, Protocol};
 use prepared_email::PreparedEmail;
 use std::net::ToSocketAddrs;
 use std::time::Duration;
@@ -23,6 +23,16 @@ pub fn smtp_delivery(
         prepared_email.to.join(", "),
         smtp_server_domain
     );
+
+    // lettre::EmailAddress checks validity.  But we checked that when we created
+    // PreparedEmail so this conversion should always pass.
+    let sendable_email = match prepared_email.as_sendable_email() {
+        Ok(se) => se,
+        Err(e) => {
+            warn!("Invalid email address error: {:?}", e);
+            return DeliveryResult::Failed(format!("Invalid email address error: {:?}", e));
+        }
+    };
 
     let smtp_server_sockaddr = match (smtp_server_domain, 25_u16).to_socket_addrs() {
         Err(e) => {
@@ -47,21 +57,19 @@ pub fn smtp_delivery(
         },
     };
 
-    let mut tls_builder = match TlsConnector::builder() {
-        Ok(builder) => builder,
+    let tls_builder = match TlsConnector::builder()
+        .min_protocol_version(Some(Protocol::Tlsv12))
+        .build()
+    {
+        Ok(connector) => connector,
         Err(e) => {
             info!("(worker) failed to create TLS Connector: {:?}", e);
             return DeliveryResult::Failed(format!("Failed to create TLS connector: {:?}", e));
         }
     };
 
-    if let Err(e) = tls_builder.supported_protocols(DEFAULT_TLS_PROTOCOLS) {
-        info!("(worker) failed to set default tls protocols: {:?}", e);
-        return DeliveryResult::Failed(format!("Failed to set supported protocols: {:?}", e));
-    }
-
     let tls_parameters =
-        ClientTlsParameters::new(smtp_server_domain.to_owned(), tls_builder.build().unwrap());
+        ClientTlsParameters::new(smtp_server_domain.to_owned(), tls_builder);
 
     let client_security = if config.require_tls {
         ClientSecurity::Required(tls_parameters)
@@ -69,7 +77,7 @@ pub fn smtp_delivery(
         ClientSecurity::Opportunistic(tls_parameters)
     };
 
-    let mailer = match SmtpTransportBuilder::new(smtp_server_sockaddr, client_security) {
+    let mailer = match SmtpClient::new(smtp_server_sockaddr, client_security) {
         Ok(m) => m,
         Err(e) => {
             return DeliveryResult::Failed(format!("Unable to setup SMTP transport: {:?}", e));
@@ -82,9 +90,9 @@ pub fn smtp_delivery(
         .hello_name( ClientId::Domain(config.helo_name.clone()) )
         .smtp_utf8(true) // is only used if the server supports it
         .timeout(Some(Duration::from_secs( config.smtp_timeout_secs )))
-        .build();
+        .transport();
 
-    let result = match mailer.send(prepared_email) {
+    let result = match mailer.send(sendable_email) {
         Ok(response) => {
             info!("(worker) delivery response: {:?}", response);
             match response.code.severity {
