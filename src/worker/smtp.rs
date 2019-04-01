@@ -4,19 +4,19 @@ use lettre::smtp::error::Error as LettreSmtpError;
 use lettre::smtp::extension::ClientId;
 use lettre::smtp::response::Severity;
 use lettre::smtp::{ClientSecurity, SmtpClient};
+use lettre::smtp::authentication::Credentials;
 use lettre::Transport;
 use native_tls::{TlsConnector, Protocol};
 use prepared_email::PreparedEmail;
 use std::net::ToSocketAddrs;
 use std::time::Duration;
-use Config;
+use config::{Config, DeliveryConfig};
 
 // Deliver an email to an SMTP server
 pub fn smtp_delivery(
     prepared_email: &PreparedEmail,
     smtp_server_domain: &str,
-    config: &Config,
-    attempt: u8,
+    config: &Config
 ) -> DeliveryResult {
     trace!(
         "SMTP delivery to [{}] at {}",
@@ -32,29 +32,6 @@ pub fn smtp_delivery(
             warn!("Invalid email address error: {:?}", e);
             return DeliveryResult::Failed(format!("Invalid email address error: {:?}", e));
         }
-    };
-
-    let smtp_server_sockaddr = match (smtp_server_domain, 25_u16).to_socket_addrs() {
-        Err(e) => {
-            warn!(
-                "ToSocketAddr failed for ({}, 25): {:?}",
-                smtp_server_domain, e
-            );
-            return DeliveryResult::Failed(format!(
-                "ToSockaddr failed for ({}, 25): {:?}",
-                smtp_server_domain, e
-            ));
-        }
-        Ok(mut iter) => match iter.next() {
-            Some(sa) => sa,
-            None => {
-                warn!("No SockAddrs for ({}, 25)", smtp_server_domain);
-                return DeliveryResult::Failed(format!(
-                    "No SockAddrs for ({}, 25)",
-                    smtp_server_domain
-                ));
-            }
-        },
     };
 
     let tls_builder = match TlsConnector::builder()
@@ -77,7 +54,31 @@ pub fn smtp_delivery(
         ClientSecurity::Opportunistic(tls_parameters)
     };
 
-    let mailer = match SmtpClient::new(smtp_server_sockaddr, client_security) {
+    // Build sockaddr
+    let sockaddr = match (smtp_server_domain, 25_u16).to_socket_addrs() {
+        Err(e) => {
+            warn!(
+                "ToSocketAddr failed for ({}, 25): {:?}",
+                smtp_server_domain, e
+            );
+            return DeliveryResult::Failed(format!(
+                "ToSockaddr failed for ({}, 25): {:?}",
+                smtp_server_domain, e
+            ));
+        }
+        Ok(mut iter) => match iter.next() {
+            Some(sa) => sa,
+            None => {
+                warn!("No SockAddrs for ({}, 25)", smtp_server_domain);
+                return DeliveryResult::Failed(format!(
+                    "No SockAddrs for ({}, 25)",
+                    smtp_server_domain
+                ));
+            }
+        },
+    };
+
+    let mailer = match SmtpClient::new(sockaddr, client_security) {
         Ok(m) => m,
         Err(e) => {
             return DeliveryResult::Failed(format!("Unable to setup SMTP transport: {:?}", e));
@@ -86,11 +87,23 @@ pub fn smtp_delivery(
 
     // Configure the mailer
     let mut mailer = mailer
-        // FIXME, our config.helo_name is unnecessarily limiting.
-        .hello_name( ClientId::Domain(config.helo_name.clone()) )
+        // FIXME, our helo_name is unnecessarily limiting.
+        .hello_name( ClientId::Domain(config.helo_name.to_owned()) )
         .smtp_utf8(true) // is only used if the server supports it
-        .timeout(Some(Duration::from_secs( config.smtp_timeout_secs )))
-        .transport();
+        .timeout(Some(Duration::from_secs( config.smtp_timeout_secs )));
+
+    if let DeliveryConfig::Relay(ref relay_config) = config.delivery {
+        mailer = mailer
+            .authentication_mechanism(relay_config.auth.mechanism)
+            .credentials(Credentials::new(
+                relay_config.auth.username.clone(),
+                relay_config.auth.password.clone()
+            ));
+    }
+
+    let mut mailer = mailer.transport();
+
+    const IGNORED_ATTEMPTS: u8 = 1;
 
     let result = match mailer.send(sendable_email) {
         Ok(response) => {
@@ -100,7 +113,7 @@ pub fn smtp_delivery(
                     DeliveryResult::Delivered(format!("{:?}", response))
                 }
                 Severity::TransientNegativeCompletion => {
-                    DeliveryResult::Deferred(attempt, format!("{:?}", response))
+                    DeliveryResult::Deferred(IGNORED_ATTEMPTS, format!("{:?}", response))
                 }
                 Severity::PermanentNegativeCompletion => {
                     DeliveryResult::Failed(format!("{:?}", response))
@@ -109,7 +122,7 @@ pub fn smtp_delivery(
         }
         Err(LettreSmtpError::Transient(response)) => {
             info!("(worker) delivery failed response: {:?}", response);
-            DeliveryResult::Deferred(attempt, format!("{:?}", response))
+            DeliveryResult::Deferred(IGNORED_ATTEMPTS, format!("{:?}", response))
         }
         Err(LettreSmtpError::Permanent(response)) => {
             info!("(worker) delivery failed response: {:?}", response);
@@ -117,7 +130,7 @@ pub fn smtp_delivery(
         }
         Err(LettreSmtpError::Resolution) => {
             info!("(worker) delivery failed: DNS resolution failed");
-            DeliveryResult::Deferred(attempt, "DNS resolution failed".to_owned())
+            DeliveryResult::Deferred(IGNORED_ATTEMPTS, "DNS resolution failed".to_owned())
         }
         // FIXME: certain LettreSmtpError::Io errors may also be transient.
         Err(e) => {
