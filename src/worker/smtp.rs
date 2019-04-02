@@ -1,16 +1,16 @@
-use delivery_result::DeliveryResult;
+use crate::config::{Config, DeliveryConfig};
+use crate::delivery_result::DeliveryResult;
+use crate::prepared_email::PreparedEmail;
+use lettre::smtp::authentication::Credentials;
 use lettre::smtp::client::net::ClientTlsParameters;
 use lettre::smtp::error::Error as LettreSmtpError;
 use lettre::smtp::extension::ClientId;
 use lettre::smtp::response::Severity;
 use lettre::smtp::{ClientSecurity, SmtpClient};
-use lettre::smtp::authentication::Credentials;
 use lettre::Transport;
 use native_tls::{TlsConnector, Protocol};
-use prepared_email::PreparedEmail;
 use std::net::ToSocketAddrs;
 use std::time::Duration;
-use config::{Config, DeliveryConfig};
 
 // Deliver an email to an SMTP server
 pub fn smtp_delivery(

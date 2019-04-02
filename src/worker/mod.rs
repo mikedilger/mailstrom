@@ -10,11 +10,11 @@ use std::time::{Duration, Instant};
 use trust_dns_resolver::Resolver;
 
 use self::task::{Task, TaskType};
-use delivery_result::DeliveryResult;
-use message_status::InternalMessageStatus;
-use prepared_email::PreparedEmail;
-use storage::MailstromStorage;
-use config::{Config, DeliveryConfig};
+use crate::config::{Config, DeliveryConfig};
+use crate::delivery_result::DeliveryResult;
+use crate::message_status::InternalMessageStatus;
+use crate::prepared_email::PreparedEmail;
+use crate::storage::MailstromStorage;
 
 const LOOP_DELAY: u64 = 10;
 
@@ -247,7 +247,7 @@ impl<S: MailstromStorage + 'static> Worker<S> {
             }
 
             if need_mx {
-                ::worker::mx::get_mx_records_for_email(
+                crate::worker::mx::get_mx_records_for_email(
                     &mut internal_message_status,
                     resolver.unwrap() // Should always succeed
                 );
@@ -468,7 +468,7 @@ fn deliver_to_one_server(
 
     // Actually deliver to this SMTP server
     // 'attempt' field in results will be set to 1
-    let result = ::worker::smtp::smtp_delivery(
+    let result = crate::worker::smtp::smtp_delivery(
         &mx_prepared_email,
         &*mx_delivery.mx_server,
         config);

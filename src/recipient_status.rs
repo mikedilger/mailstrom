@@ -1,4 +1,4 @@
-use delivery_result::DeliveryResult;
+use crate::delivery_result::DeliveryResult;
 
 /// Per-Recipient Delivery Information
 #[derive(Debug, Clone, Serialize, Deserialize)]

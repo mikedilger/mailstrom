@@ -159,14 +159,14 @@ impl<S: MailstromStorage + 'static> Mailstrom<S> {
     /// because some clients are only interested in reading the status of sent emails,
     /// and will terminate before any real sending can be accomplished.
     pub fn start(&mut self) -> Result<(), Error> {
-        try!(self.sender.send(Message::Start));
+        self.sender.send(Message::Start)?;
         Ok(())
     }
 
     /// Ask Mailstrom to die.  This is not required, you can simply let it fall out
     /// of scope and it will clean itself up.
     pub fn die(&mut self) -> Result<(), Error> {
-        try!(self.sender.send(Message::Terminate));
+        self.sender.send(Message::Terminate)?;
         Ok(())
     }
 
@@ -179,7 +179,7 @@ impl<S: MailstromStorage + 'static> Mailstrom<S> {
     /// Send an email, getting back its message-id
     pub fn send_email(&mut self, email: Email) -> Result<String, Error> {
         let (prepared_email, internal_message_status) =
-            ::prepared_email::prepare_email(email, &*self.config.helo_name)?;
+            crate::prepared_email::prepare_email(email, &*self.config.helo_name)?;
 
         let message_id = internal_message_status.message_id.clone();
 
@@ -191,10 +191,10 @@ impl<S: MailstromStorage + 'static> Mailstrom<S> {
             };
 
             // Store the email
-            try!((*guard).store(prepared_email, internal_message_status));
+            (*guard).store(prepared_email, internal_message_status)?;
         }
 
-        try!(self.sender.send(Message::SendEmail(message_id.clone())));
+        self.sender.send(Message::SendEmail(message_id.clone()))?;
 
         info!("Passed email {} off to worker", &*message_id);
 
@@ -208,7 +208,7 @@ impl<S: MailstromStorage + 'static> Mailstrom<S> {
             Err(_) => return Err(Error::Lock),
         };
 
-        let status = try!((*guard).retrieve_status(message_id));
+        let status = (*guard).retrieve_status(message_id)?;
 
         Ok(status.as_message_status())
     }
@@ -222,7 +222,7 @@ impl<S: MailstromStorage + 'static> Mailstrom<S> {
             Err(_) => return Err(Error::Lock),
         };
 
-        let vec_statuses = try!((*guard).retrieve_all_recent());
+        let vec_statuses = (*guard).retrieve_all_recent()?;
         Ok(vec_statuses.iter().map(|s| s.as_message_status()).collect())
     }
 }

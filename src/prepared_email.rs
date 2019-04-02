@@ -1,11 +1,11 @@
-use delivery_result::DeliveryResult;
+use crate::delivery_result::DeliveryResult;
 use email_format::rfc5322::headers::Bcc;
 use email_format::rfc5322::types::{Address, GroupList, Mailbox};
 use email_format::Email;
-use error::Error;
+use crate::error::Error;
 use lettre::{EmailAddress, SendableEmail, Envelope};
-use message_status::InternalMessageStatus;
-use recipient_status::InternalRecipientStatus;
+use crate::message_status::InternalMessageStatus;
+use crate::recipient_status::InternalRecipientStatus;
 use uuid::Uuid;
 
 /// An email, prepared for delivery.

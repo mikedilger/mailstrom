@@ -1,5 +1,5 @@
-use delivery_result::DeliveryResult;
-use recipient_status::{InternalRecipientStatus, RecipientStatus};
+use crate::delivery_result::DeliveryResult;
+use crate::recipient_status::{InternalRecipientStatus, RecipientStatus};
 
 /// An email to be sent (internal format).  This is exposed publicly for
 /// implementers of `MailstromStorage` but otherwise should not

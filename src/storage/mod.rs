@@ -1,8 +1,8 @@
 pub mod memory_storage;
 pub use self::memory_storage::MemoryStorage;
 
-use message_status::InternalMessageStatus;
-use prepared_email::PreparedEmail;
+use crate::message_status::InternalMessageStatus;
+use crate::prepared_email::PreparedEmail;
 
 pub trait MailstromStorageError: ::std::error::Error {}
 

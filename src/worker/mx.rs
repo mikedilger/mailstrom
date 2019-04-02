@@ -1,5 +1,5 @@
 use super::is_ip;
-use message_status::InternalMessageStatus;
+use crate::message_status::InternalMessageStatus;
 use trust_dns_resolver::Resolver;
 
 // Get MX records for email recipients

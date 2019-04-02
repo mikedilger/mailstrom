@@ -1,9 +1,9 @@
-use message_status::InternalMessageStatus;
-use prepared_email::PreparedEmail;
+use crate::message_status::InternalMessageStatus;
+use crate::prepared_email::PreparedEmail;
+use crate::storage::{MailstromStorage, MailstromStorageError};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
-use storage::{MailstromStorage, MailstromStorageError};
 
 #[derive(Debug)]
 pub enum MemoryStorageError {

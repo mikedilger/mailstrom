@@ -5,9 +5,10 @@ description = "Email sender"
 authors = ["Mike Dilger <mike@optcomp.nz>"]
 readme = "README.md"
 repository = "https://github.com/mikedilger/mailstrom"
-documentation = "https://mikedilger.github.io/mailstrom"
+documentation = "https://docs.rs/mailstrom"
 license = "MIT OR Apache-2.0"
 keywords = [ "email" ]
+edition = "2018"
 
 [dev-dependencies]
 env_logger = "0.3"
