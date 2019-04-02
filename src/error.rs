@@ -64,7 +64,7 @@ impl ::std::fmt::Display for Error {
             Error::General(ref e) => format!("{}: {}", self.description(), e).fmt(f),
             Error::Storage(ref s) => format!("{}: {}", self.description(), s).fmt(f),
             Error::LettreEmailAddress(ref e) => format!("{}: {}", self.description(), e).fmt(f),
-            _ => format!("{}", self.description()).fmt(f),
+            _ => self.description().to_string().fmt(f),
         }
     }
 }

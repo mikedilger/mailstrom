@@ -56,7 +56,7 @@ impl MailstromStorage for MemoryStorage {
         self.0.insert(
             internal_message_status.message_id.clone(),
             Record {
-                email: email,
+                email,
                 status: internal_message_status,
                 retrieved: false,
             },

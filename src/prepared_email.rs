@@ -69,8 +69,8 @@ pub fn prepare_email(
         .try_for_each(|s| ::lettre::EmailAddress::new(s.clone()).map(|_|()))?;
 
     let internal_message_status = InternalMessageStatus {
-        message_id: message_id,
-        recipients: recipients,
+        message_id,
+        recipients,
         attempts_remaining: 3,
     };
 

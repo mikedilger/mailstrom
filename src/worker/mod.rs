@@ -79,10 +79,10 @@ impl<S: MailstromStorage + 'static> Worker<S> {
         config: Config,
     ) -> Worker<S> {
         let mut worker = Worker {
-            receiver: receiver,
-            worker_status: worker_status,
-            config: config,
-            storage: storage,
+            receiver,
+            worker_status,
+            config,
+            storage,
             tasks: BTreeSet::new(),
             paused: true,
         };
@@ -165,7 +165,7 @@ impl<S: MailstromStorage + 'static> Worker<S> {
                         self.tasks.insert(Task {
                             tasktype: TaskType::Resend,
                             time: Instant::now(),
-                            message_id: message_id,
+                            message_id
                         });
                     }
                     Message::Terminate => {

@@ -148,10 +148,10 @@ impl<S: MailstromStorage + 'static> Mailstrom<S> {
         });
 
         Mailstrom {
-            config: config,
-            sender: sender,
-            worker_status: worker_status,
-            storage: storage,
+            config,
+            sender,
+            worker_status,
+            storage,
         }
     }
 
