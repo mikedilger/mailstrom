@@ -14,11 +14,12 @@ background worker thread.  It does the following:
  * Handles all parsing, validation, and encoding of email content and headers,
    in compliance with RFC 5322 (and other RFCs).  Uses the
    [email-format](https://github.com/mikedilger/email-format) library for this.
- * Looks up the DNS MX records of the recipients, and delivers directly to those Internet
-   mail servers over SMTP, thus not requiring any local SMTP relay.  Uses the
-   [trust-dns](https://github.com/bluejekyll/trust-dns) library for DNS lookups
+ * Either delivers via a configured SMTP relay, or directly to recipient mail servers
+   by looking up the DNS MX record for each recipient and delivering directly to those
+   Internet mail servers over SMTP.  Uses the
+   [trust-dns](https://github.com/bluejekyll/trust-dns) library for DNS lookups.
  * SMTP transport "heavy lifting" is performed via the [lettre](https://github.com/lettre/lettre)
-   library.  Uses STARTTLS.
+   library.  Uses STARTTLS where available.
  * Retries with exponential backoff for a fixed number of retries (currently fixed at 3),
    when the send result is Deferred
  * Uses a pluggable user-defined state management (persistence) layer.
