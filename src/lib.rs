@@ -90,7 +90,7 @@ extern crate native_tls;
 mod tests;
 
 mod config;
-pub use config::{Config, DeliveryConfig, RelayConfig, RemoteDeliveryConfig};
+pub use config::{Config, DeliveryConfig, RelayConfig, RemoteDeliveryConfig, SmtpAuth};
 
 mod worker;
 pub use worker::WorkerStatus;
