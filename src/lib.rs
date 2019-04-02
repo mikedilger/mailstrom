@@ -34,7 +34,8 @@
 //! extern crate mailstrom;
 //!
 //! use email_format::Email;
-//! use mailstrom::{Mailstrom, Config, MemoryStorage};
+//! use mailstrom::{Mailstrom, Config};
+//! use mailstrom::storage::MemoryStorage;
 //!
 //! fn main() {
 //!     let mut email = Email::new(
@@ -110,8 +111,8 @@ pub use message_status::MessageStatus;
 
 mod prepared_email;
 
-mod storage;
-pub use storage::{MailstromStorage, MailstromStorageError, MemoryStorage};
+pub mod storage;
+use storage::MailstromStorage;
 
 use email_format::Email;
 use std::ops::Drop;
