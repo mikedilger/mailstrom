@@ -1,7 +1,9 @@
 extern crate env_logger;
 
-use storage::MemoryStorage;
-use {Config, Mailstrom, WorkerStatus};
+use crate::config::Config;
+use crate::storage::MemoryStorage;
+use crate::worker::WorkerStatus;
+use crate::Mailstrom;
 
 #[test]
 fn test_terminate() {

@@ -1,10 +1,10 @@
+use crate::storage::MailstromStorageError;
+use crate::worker::Message;
 use email_format::rfc5322::ParseError;
+use failure;
 use std::convert::From;
 use std::io::Error as IoError;
 use std::sync::mpsc::SendError;
-use failure;
-use crate::storage::MailstromStorageError;
-use crate::worker::Message;
 
 #[derive(Debug)]
 pub enum Error {

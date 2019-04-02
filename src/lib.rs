@@ -93,8 +93,10 @@ pub use config::{Config, DeliveryConfig, RelayConfig, RemoteDeliveryConfig};
 
 mod worker;
 pub use worker::WorkerStatus;
+use worker::{Message, Worker};
 
 pub mod error;
+use error::Error;
 
 mod delivery_result;
 pub use delivery_result::DeliveryResult;
@@ -102,23 +104,19 @@ pub use delivery_result::DeliveryResult;
 mod recipient_status;
 pub use recipient_status::RecipientStatus;
 
-pub mod message_status;
+mod message_status;
 pub use message_status::MessageStatus;
 
-pub mod prepared_email;
-pub use prepared_email::PreparedEmail;
+mod prepared_email;
 
 mod storage;
+pub use storage::{MailstromStorage, MailstromStorageError, MemoryStorage};
 
 use email_format::Email;
 use std::ops::Drop;
 use std::sync::{mpsc, Arc, RwLock};
 use std::thread;
 
-use error::Error;
-pub use message_status::InternalMessageStatus;
-pub use storage::{MailstromStorage, MailstromStorageError, MemoryStorage};
-use worker::{Message, Worker};
 
 pub struct Mailstrom<S: MailstromStorage + 'static> {
     config: Config,

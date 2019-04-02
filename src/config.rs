@@ -1,5 +1,5 @@
-use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
 use lettre::smtp::authentication::Mechanism;
+use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
 
 /// Authentication settings for an SMTP relay
 #[derive(Clone)]
