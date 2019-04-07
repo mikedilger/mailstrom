@@ -34,7 +34,8 @@
 //! extern crate mailstrom;
 //!
 //! use email_format::Email;
-//! use mailstrom::{Mailstrom, Config};
+//! use mailstrom::Mailstrom;
+//! use mailstrom::config::Config;
 //! use mailstrom::storage::MemoryStorage;
 //!
 //! fn main() {
@@ -90,8 +91,8 @@ extern crate native_tls;
 #[cfg(test)]
 mod tests;
 
-mod config;
-pub use config::{Config, DeliveryConfig, RelayConfig, RemoteDeliveryConfig, SmtpAuth};
+pub mod config;
+use config::Config;
 
 mod worker;
 pub use worker::WorkerStatus;
