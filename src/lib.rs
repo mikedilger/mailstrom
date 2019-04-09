@@ -87,6 +87,7 @@ extern crate log;
 #[macro_use]
 extern crate serde_derive;
 extern crate native_tls;
+extern crate toml;
 
 #[cfg(test)]
 mod tests;
