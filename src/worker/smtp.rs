@@ -1,4 +1,4 @@
-use crate::config::{Config, DeliveryConfig};
+use crate::config::Config;
 use crate::delivery_result::DeliveryResult;
 use crate::prepared_email::PreparedEmail;
 use lettre::smtp::authentication::Credentials;
@@ -92,7 +92,7 @@ pub fn smtp_delivery(
         .smtp_utf8(true) // is only used if the server supports it
         .timeout(Some(Duration::from_secs( config.smtp_timeout_secs )));
 
-    if let DeliveryConfig::Relay(ref relay_config) = config.delivery {
+    if let Some(ref relay_config) = config.relay_delivery {
         mailer = mailer
             .authentication_mechanism(relay_config.auth.mechanism)
             .credentials(Credentials::new(

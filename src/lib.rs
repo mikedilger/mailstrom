@@ -60,7 +60,7 @@
 //!             helo_name: "my.host.domainname".to_owned(),
 //!             ..Default::default()
 //!         },
-//!         MemoryStorage::new());
+//!         MemoryStorage::new()).unwrap();
 //!
 //!     // We must explicitly tell mailstrom to start actually sending emails.  If we
 //!     // were only interested in reading the status of previously sent emails, we
@@ -131,7 +131,14 @@ pub struct Mailstrom<S: MailstromStorage + 'static> {
 
 impl<S: MailstromStorage + 'static> Mailstrom<S> {
     /// Create a new Mailstrom instance for sending emails.
-    pub fn new(config: Config, storage: S) -> Mailstrom<S> {
+    pub fn new(config: Config, storage: S) -> Result<Mailstrom<S>, Error>
+    {
+        if ! config.is_valid() {
+            return Err(Error::General(
+                "Config is not valid (must define exactly one of remote or relay delivery)"
+                    .to_string()));
+        }
+
         let (sender, receiver) = mpsc::channel();
 
         let storage = Arc::new(RwLock::new(storage));
@@ -149,12 +156,12 @@ impl<S: MailstromStorage + 'static> Mailstrom<S> {
             worker.run();
         });
 
-        Mailstrom {
+        Ok(Mailstrom {
             config,
             sender,
             worker_status,
             storage,
-        }
+        })
     }
 
     /// Mailstrom requires an explicit start command to start sending emails.  This is

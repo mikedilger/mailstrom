@@ -33,21 +33,6 @@ impl Default for RemoteDeliveryConfig {
     }
 }
 
-/// Delivery configuration
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum DeliveryConfig {
-    /// Deliver everything through an SMTP relay
-    Relay(RelayConfig),
-    /// Deliver directly directly to recipient domain MX servers
-    Remote(RemoteDeliveryConfig)
-}
-
-impl Default for DeliveryConfig {
-    fn default() -> DeliveryConfig {
-        DeliveryConfig::Remote(RemoteDeliveryConfig::default())
-    }
-}
-
 /// Mailstrom configuration settings
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
@@ -56,7 +41,8 @@ pub struct Config {
     pub smtp_timeout_secs: u64,
     pub base_resend_delay_secs: u64,
     pub require_tls: bool,
-    pub delivery: DeliveryConfig,
+    pub relay_delivery: Option<RelayConfig>,
+    pub remote_delivery: Option<RemoteDeliveryConfig>,
 }
 
 impl Default for Config {
@@ -66,7 +52,15 @@ impl Default for Config {
             smtp_timeout_secs: 60,
             base_resend_delay_secs: 60,
             require_tls: false,
-            delivery: DeliveryConfig::default(),
+            relay_delivery: None,
+            remote_delivery: Some(Default::default()),
         }
+    }
+}
+
+impl Config {
+    pub fn is_valid(&self) -> bool {
+        // Exactly one of these must be true, the other false:
+        self.relay_delivery.is_some() ^ self.remote_delivery.is_some()
     }
 }

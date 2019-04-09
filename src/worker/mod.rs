@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use trust_dns_resolver::Resolver;
 
 use self::task::{Task, TaskType};
-use crate::config::{Config, DeliveryConfig};
+use crate::config::Config;
 use crate::delivery_result::DeliveryResult;
 use crate::message_status::InternalMessageStatus;
 use crate::prepared_email::PreparedEmail;
@@ -109,19 +109,18 @@ impl<S: MailstromStorage + 'static> Worker<S> {
     }
 
     pub fn run(&mut self) {
-        let resolver: Option<Resolver> = match self.config.delivery {
-            DeliveryConfig::Relay(_) => None,
-            DeliveryConfig::Remote(ref rdc) => {
-                match Resolver::new(rdc.resolver_config.clone(), rdc.resolver_opts) {
-                    Ok(resolver) => Some(resolver),
-                    Err(e) => {
-                        *self.worker_status.write().unwrap() =
-                            WorkerStatus::ResolverCreationFailed as u8;
-                        info!("(worker) failed and terminated: {:?}", e);
-                        return;
-                    }
+        let resolver: Option<Resolver> = if let Some(ref rdc) = self.config.remote_delivery {
+            match Resolver::new(rdc.resolver_config.clone(), rdc.resolver_opts) {
+                Ok(resolver) => Some(resolver),
+                Err(e) => {
+                    *self.worker_status.write().unwrap() =
+                        WorkerStatus::ResolverCreationFailed as u8;
+                    info!("(worker) failed and terminated: {:?}", e);
+                    return;
                 }
             }
+        } else {
+            None
         };
 
         loop {
@@ -236,7 +235,7 @@ impl<S: MailstromStorage + 'static> Worker<S> {
     ) -> WorkerStatus {
 
         // Determine MX records only if doing remote delivery
-        if let DeliveryConfig::Remote(_) = self.config.delivery {
+        if self.config.remote_delivery.is_some() {
 
             let mut need_mx: bool = false;
             for recipient in &internal_message_status.recipients {
@@ -359,7 +358,7 @@ fn plan_mxdelivery_sessions(
     config: &Config
 ) -> Vec<MxDelivery> {
     // If we are using DeliveryConfig::Relay(_), the answer is straightforward
-    if let DeliveryConfig::Relay(ref relay_config) = config.delivery {
+    if let Some(ref relay_config) = config.relay_delivery {
         return vec![MxDelivery {
             mx_server: relay_config.domain_name.clone(),
             recipients: (0..internal_message_status.recipients.len()).collect()
