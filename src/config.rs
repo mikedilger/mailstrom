@@ -18,6 +18,7 @@ pub struct RelayConfig {
 
 /// Delivery configuration needed if delivering directly to MX servers
 #[derive(Clone, Debug, Deserialize)]
+#[serde(default)]
 pub struct RemoteDeliveryConfig {
     pub resolver_config: ResolverConfig,
     pub resolver_opts: ResolverOpts,
@@ -49,6 +50,7 @@ impl Default for DeliveryConfig {
 
 /// Mailstrom configuration settings
 #[derive(Clone, Debug, Deserialize)]
+#[serde(default)]
 pub struct Config {
     pub helo_name: String,
     pub smtp_timeout_secs: u64,
