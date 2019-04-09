@@ -2,7 +2,7 @@ pub use lettre::smtp::authentication::Mechanism;
 pub use trust_dns_resolver::config::{ResolverConfig, ResolverOpts, NameServerConfig, Protocol};
 
 /// Authentication settings for an SMTP relay
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct SmtpAuth {
     pub mechanism: Mechanism,
     pub username: String,
@@ -10,14 +10,14 @@ pub struct SmtpAuth {
 }
 
 /// Delivery configuration needed if using an SMTP relay
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct RelayConfig {
     pub domain_name: String,
     pub auth: SmtpAuth,
 }
 
 /// Delivery configuration needed if delivering directly to MX servers
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct RemoteDeliveryConfig {
     pub resolver_config: ResolverConfig,
     pub resolver_opts: ResolverOpts,
@@ -33,7 +33,7 @@ impl Default for RemoteDeliveryConfig {
 }
 
 /// Delivery configuration
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub enum DeliveryConfig {
     /// Deliver everything through an SMTP relay
     Relay(RelayConfig),
@@ -48,7 +48,7 @@ impl Default for DeliveryConfig {
 }
 
 /// Mailstrom configuration settings
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Config {
     pub helo_name: String,
     pub smtp_timeout_secs: u64,
