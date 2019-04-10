@@ -131,7 +131,8 @@ pub struct Mailstrom<S: MailstromStorage + 'static> {
 
 impl<S: MailstromStorage + 'static> Mailstrom<S> {
     /// Create a new Mailstrom instance for sending emails.
-    pub fn new(config: Config, storage: S) -> Mailstrom<S> {
+    pub fn new(config: Config, storage: S) -> Mailstrom<S>
+    {
         let (sender, receiver) = mpsc::channel();
 
         let storage = Arc::new(RwLock::new(storage));

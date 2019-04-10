@@ -1,5 +1,6 @@
 pub use lettre::smtp::authentication::Mechanism;
 pub use trust_dns_resolver::config::{ResolverConfig, ResolverOpts, NameServerConfig, Protocol};
+use std::net::SocketAddr;
 
 /// Authentication settings for an SMTP relay
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -16,19 +17,35 @@ pub struct RelayConfig {
     pub auth: SmtpAuth,
 }
 
-/// Delivery configuration needed if delivering directly to MX servers
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum ResolverSetup {
+    SystemConf,
+    Google,
+    Cloudflare,
+    Quad9,
+    Specific {
+        socket: SocketAddr,
+        protocol: Protocol,
+        tls_dns_name: Option<String>
+    }
+}
+
+impl Default for ResolverSetup {
+    fn default() -> ResolverSetup {
+        ResolverSetup::SystemConf
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct RemoteDeliveryConfig {
-    pub resolver_config: ResolverConfig,
-    pub resolver_opts: ResolverOpts,
+    pub resolver_setup: ResolverSetup
 }
 
 impl Default for RemoteDeliveryConfig {
     fn default() -> RemoteDeliveryConfig {
         RemoteDeliveryConfig {
-            resolver_config: ResolverConfig::default(),
-            resolver_opts: ResolverOpts::default(),
+            resolver_setup: Default::default()
         }
     }
 }
@@ -66,7 +83,7 @@ impl Default for Config {
             smtp_timeout_secs: 60,
             base_resend_delay_secs: 60,
             require_tls: false,
-            delivery: DeliveryConfig::default(),
+            delivery: Default::default(),
         }
     }
 }

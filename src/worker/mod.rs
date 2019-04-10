@@ -8,9 +8,10 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 use trust_dns_resolver::Resolver;
+use trust_dns_resolver::config::{ResolverConfig, NameServerConfig};
 
 use self::task::{Task, TaskType};
-use crate::config::{Config, DeliveryConfig};
+use crate::config::{Config, DeliveryConfig, ResolverSetup};
 use crate::delivery_result::DeliveryResult;
 use crate::message_status::InternalMessageStatus;
 use crate::prepared_email::PreparedEmail;
@@ -109,11 +110,29 @@ impl<S: MailstromStorage + 'static> Worker<S> {
     }
 
     pub fn run(&mut self) {
-        let resolver: Option<Resolver> = match self.config.delivery {
-            DeliveryConfig::Relay(_) => None,
-            DeliveryConfig::Remote(ref rdc) => {
-                match Resolver::new(rdc.resolver_config.clone(), rdc.resolver_opts) {
-                    Ok(resolver) => Some(resolver),
+        let resolver: Option<Resolver> = {
+            if let DeliveryConfig::Remote(ref rdc) = self.config.delivery {
+                let result = match rdc.resolver_setup {
+                    ResolverSetup::SystemConf => Resolver::from_system_conf(),
+                    ResolverSetup::Google => Resolver::new(
+                        ResolverConfig::google(), Default::default()),
+                    ResolverSetup::Cloudflare => Resolver::new(
+                        ResolverConfig::cloudflare(), Default::default()),
+                    ResolverSetup::Quad9 => Resolver::new(
+                        ResolverConfig::quad9(), Default::default()),
+                    ResolverSetup::Specific {
+                        socket, protocol, ref tls_dns_name
+                    } => Resolver::new(
+                        ResolverConfig::from_parts(
+                            None, vec![], vec![NameServerConfig {
+                                socket_addr: socket,
+                                protocol: protocol,
+                                tls_dns_name: tls_dns_name.clone()
+                            }]),
+                        Default::default()),
+                };
+                match result {
+                    Ok(r) => Some(r),
                     Err(e) => {
                         *self.worker_status.write().unwrap() =
                             WorkerStatus::ResolverCreationFailed as u8;
@@ -121,6 +140,8 @@ impl<S: MailstromStorage + 'static> Worker<S> {
                         return;
                     }
                 }
+            } else {
+                None
             }
         };
 
