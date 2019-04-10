@@ -7,8 +7,7 @@ use crate::Mailstrom;
 
 #[test]
 fn test_terminate() {
-    let mut mailstrom = Mailstrom::new(Config::default(), MemoryStorage::new())
-        .unwrap();
+    let mut mailstrom = Mailstrom::new(Config::default(), MemoryStorage::new());
 
     assert_eq!(mailstrom.worker_status(), WorkerStatus::Ok);
     mailstrom.die().unwrap();
