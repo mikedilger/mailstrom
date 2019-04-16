@@ -355,6 +355,7 @@ impl<S: MailstromStorage + 'static> Worker<S> {
 
 struct MxDelivery {
     mx_server: String,      // domain name
+    mx_port: u16,           // port (defaults to 25)
     recipients: Vec<usize>, // index into InternalMessageStatus.recipients
 }
 
@@ -383,6 +384,7 @@ fn plan_mxdelivery_sessions(
     if let DeliveryConfig::Relay(ref relay_config) = config.delivery {
         return vec![MxDelivery {
             mx_server: relay_config.domain_name.clone(),
+            mx_port: relay_config.port.unwrap_or(25_u16),
             recipients: (0..internal_message_status.recipients.len()).collect()
         }];
     }
@@ -435,6 +437,7 @@ fn plan_mxdelivery_sessions(
                     // Add this new MX server with the current recipient
                     mx_deliveries.push(MxDelivery {
                         mx_server: item.clone(),
+                        mx_port: 25,
                         recipients: vec![r_index],
                     });
                 }
@@ -492,6 +495,7 @@ fn deliver_to_one_server(
     let result = crate::worker::smtp::smtp_delivery(
         &mx_prepared_email,
         &*mx_delivery.mx_server,
+        mx_delivery.mx_port,
         config);
 
     // Fix 'attempt' field in results on a per-recipient basis (not a per-mx basis)

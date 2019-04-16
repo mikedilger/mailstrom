@@ -14,6 +14,7 @@ pub struct SmtpAuth {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RelayConfig {
     pub domain_name: String,
+    pub port: Option<u16>,
     pub auth: SmtpAuth,
 }
 

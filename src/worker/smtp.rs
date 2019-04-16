@@ -16,6 +16,7 @@ use std::time::Duration;
 pub fn smtp_delivery(
     prepared_email: &PreparedEmail,
     smtp_server_domain: &str,
+    port: u16,
     config: &Config
 ) -> DeliveryResult {
     trace!(
@@ -55,24 +56,24 @@ pub fn smtp_delivery(
     };
 
     // Build sockaddr
-    let sockaddr = match (smtp_server_domain, 25_u16).to_socket_addrs() {
+    let sockaddr = match (smtp_server_domain, port).to_socket_addrs() {
         Err(e) => {
             warn!(
-                "ToSocketAddr failed for ({}, 25): {:?}",
-                smtp_server_domain, e
+                "ToSocketAddr failed for ({}, {}): {:?}",
+                smtp_server_domain, port, e
             );
             return DeliveryResult::Failed(format!(
-                "ToSockaddr failed for ({}, 25): {:?}",
-                smtp_server_domain, e
+                "ToSockaddr failed for ({}, {}): {:?}",
+                smtp_server_domain, port, e
             ));
         }
         Ok(mut iter) => match iter.next() {
             Some(sa) => sa,
             None => {
-                warn!("No SockAddrs for ({}, 25)", smtp_server_domain);
+                warn!("No SockAddrs for ({}, {})", smtp_server_domain, port);
                 return DeliveryResult::Failed(format!(
-                    "No SockAddrs for ({}, 25)",
-                    smtp_server_domain
+                    "No SockAddrs for ({}, {})",
+                    smtp_server_domain, port
                 ));
             }
         },
