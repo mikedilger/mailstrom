@@ -1,12 +1,12 @@
-use std::cmp::{Ord, Ordering, PartialEq, PartialOrd};
+use std::cmp::{Ord, Ordering, PartialOrd};
 use std::time::Instant;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TaskType {
     Resend,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Task {
     pub tasktype: TaskType,
     pub time: Instant,
@@ -22,12 +22,6 @@ impl Ord for Task {
 impl PartialOrd for Task {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.time.partial_cmp(&other.time)
-    }
-}
-
-impl PartialEq for Task {
-    fn eq(&self, other: &Self) -> bool {
-        self.time.eq(&other.time)
     }
 }
 

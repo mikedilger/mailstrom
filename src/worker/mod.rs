@@ -89,24 +89,45 @@ impl<S: MailstromStorage + 'static> Worker<S> {
         };
 
         // Load the incomplete (queued and/or deferred) email statuses, for tasking
-        if let Ok(guard) = (*worker.storage).write() {
+        worker.refresh_resend_tasks();
+
+        worker
+    }
+
+    // Sometimes other processes queue mail into Storage w/o the ability to message
+    // us. So we periodically reread storage and refresh our resend tasks
+    pub fn refresh_resend_tasks(&mut self) {
+
+        // Remove all resend tasks (we will create them anew)
+        {
+            let mut t: Vec<Task> = vec![]; // temp holding for tasks to delete
+            for task in &self.tasks {
+                if task.tasktype==TaskType::Resend {
+                    t.push(task.clone());
+                }
+            }
+            for task in &t {
+                let _ = self.tasks.remove(task);
+            }
+        }
+
+        // Load the incomplete (queued and/or deferred) email statuses, for tasking
+        if let Ok(guard) = (*self.storage).write() {
             if let Ok(mut isvec) = (*guard).retrieve_all_incomplete() {
                 // Create one task for each queued/deferred email
                 for is in isvec.drain(..) {
-                    worker.tasks.insert(Task {
+                    self.tasks.insert(Task {
                         tasktype: TaskType::Resend,
                         time: Instant::now(),
                         message_id: is.message_id.clone(),
                     });
                 }
             } else {
-                *worker.worker_status.write().unwrap() = WorkerStatus::StorageReadFailed as u8;
+                *self.worker_status.write().unwrap() = WorkerStatus::StorageReadFailed as u8;
             }
         } else {
-            *worker.worker_status.write().unwrap() = WorkerStatus::LockPoisoned as u8;
+            *self.worker_status.write().unwrap() = WorkerStatus::LockPoisoned as u8;
         }
-
-        worker
     }
 
     pub fn run(&mut self) {
