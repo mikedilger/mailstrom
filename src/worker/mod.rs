@@ -18,6 +18,7 @@ use crate::prepared_email::PreparedEmail;
 use crate::storage::MailstromStorage;
 
 const LOOP_DELAY: u64 = 10;
+const CHECK_STORAGE_PERIOD: u64 = 90;
 
 pub enum Message {
     /// Start sending emails
@@ -70,6 +71,8 @@ pub struct Worker<S: MailstromStorage + 'static> {
     tasks: BTreeSet<Task>,
 
     paused: bool,
+
+    last_refresh: Instant,
 }
 
 impl<S: MailstromStorage + 'static> Worker<S> {
@@ -86,6 +89,7 @@ impl<S: MailstromStorage + 'static> Worker<S> {
             storage,
             tasks: BTreeSet::new(),
             paused: true,
+            last_refresh: Instant::now(),
         };
 
         // Load the incomplete (queued and/or deferred) email statuses, for tasking
@@ -128,6 +132,8 @@ impl<S: MailstromStorage + 'static> Worker<S> {
         } else {
             *self.worker_status.write().unwrap() = WorkerStatus::LockPoisoned as u8;
         }
+
+        self.last_refresh = Instant::now();
     }
 
     pub fn run(&mut self) {
@@ -226,6 +232,12 @@ impl<S: MailstromStorage + 'static> Worker<S> {
             };
 
             if !self.paused {
+                // Possibly refresh tasks from storage
+                if self.last_refresh + Duration::from_secs(CHECK_STORAGE_PERIOD) < Instant::now() {
+                    self.refresh_resend_tasks();
+                }
+
+
                 // Copy out all the tasks that are due
                 let now = Instant::now();
                 let due_tasks: Vec<Task> = self.tasks
