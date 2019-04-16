@@ -82,6 +82,7 @@ pub fn smtp_delivery(
     let mailer = match SmtpClient::new(sockaddr, client_security) {
         Ok(m) => m,
         Err(e) => {
+            info!("(worker) failed to setup SMTP transport: {:?}", e);
             return DeliveryResult::Failed(format!("Unable to setup SMTP transport: {:?}", e));
         }
     };
