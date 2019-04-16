@@ -11,6 +11,7 @@ use lettre::Transport;
 use native_tls::{TlsConnector, Protocol};
 use std::net::ToSocketAddrs;
 use std::time::Duration;
+use std::io::ErrorKind;
 
 // Deliver an email to an SMTP server
 pub fn smtp_delivery(
@@ -19,11 +20,6 @@ pub fn smtp_delivery(
     port: u16,
     config: &Config
 ) -> DeliveryResult {
-    trace!(
-        "SMTP delivery to [{}] at {}",
-        prepared_email.to.join(", "),
-        smtp_server_domain
-    );
 
     // lettre::EmailAddress checks validity.  But we checked that when we created
     // PreparedEmail so this conversion should always pass.
@@ -107,34 +103,82 @@ pub fn smtp_delivery(
 
     const IGNORED_ATTEMPTS: u8 = 1;
 
+    debug!(
+        "Starting SMTP delivery to [{}] at {}",
+        prepared_email.to.join(", "),
+        smtp_server_domain
+    );
+
+    #[allow(unreachable_patterns)] // lettre may add more
     let result = match mailer.send(sendable_email) {
         Ok(response) => {
-            info!("(worker) delivery response: {:?}", response);
             match response.code.severity {
                 Severity::PositiveCompletion | Severity::PositiveIntermediate => {
+                    info!("(worker) Delivery Success: {:?}", response);
                     DeliveryResult::Delivered(format!("{:?}", response))
                 }
                 Severity::TransientNegativeCompletion => {
+                    info!("(worker) Delivery Deferred: {:?}", response);
                     DeliveryResult::Deferred(IGNORED_ATTEMPTS, format!("{:?}", response))
                 }
                 Severity::PermanentNegativeCompletion => {
+                    info!("(worker) Delivery Failed: {:?}", response);
                     DeliveryResult::Failed(format!("{:?}", response))
                 }
             }
-        }
+        },
         Err(LettreSmtpError::Transient(response)) => {
-            info!("(worker) delivery failed response: {:?}", response);
+            info!("(worker) Delivery Deferred: {:?}", response);
             DeliveryResult::Deferred(IGNORED_ATTEMPTS, format!("{:?}", response))
-        }
+        },
         Err(LettreSmtpError::Permanent(response)) => {
-            info!("(worker) delivery failed response: {:?}", response);
+            info!("(worker) Delivery Failed: {:?}", response);
             DeliveryResult::Failed(format!("{:?}", response))
-        }
+        },
         Err(LettreSmtpError::Resolution) => {
-            info!("(worker) delivery failed: DNS resolution failed");
+            info!("(worker) DNS resolution failed");
             DeliveryResult::Deferred(IGNORED_ATTEMPTS, "DNS resolution failed".to_owned())
-        }
-        // FIXME: certain LettreSmtpError::Io errors may also be transient.
+        },
+        Err(LettreSmtpError::ResponseParsing(s)) => {
+            info!("(worker) Delivery Failed (response parsing error): {}", s);
+            DeliveryResult::Failed(format!("response parsing error: {}", s))
+        },
+        Err(LettreSmtpError::ChallengeParsing(de)) => {
+            info!("(worker) Delivery Failed (challenge parsing error): {:?}", de);
+            DeliveryResult::Failed(format!("challenge parsing error: {:?}", de))
+        },
+        Err(LettreSmtpError::Utf8Parsing(fue)) => {
+            info!("(worker) Delivery Failed (utf8 parsing error): {:?}", fue);
+            DeliveryResult::Failed(format!("utf8 parsing error: {:?}", fue))
+        },
+        Err(LettreSmtpError::Client(s)) => {
+            info!("(worker) Delivery Failed (internal client error): {}", s);
+            DeliveryResult::Failed(format!("internal client error: {:?}", s))
+        },
+        Err(LettreSmtpError::Io(ioe)) => {
+            match ioe.kind() {
+                ErrorKind::ConnectionAborted |
+                ErrorKind::AddrInUse |
+                ErrorKind::BrokenPipe |
+                ErrorKind::TimedOut |
+                ErrorKind::Interrupted => {
+                    info!("(worker) Delivery Deferred (I/O error): {:?}", ioe);
+                    DeliveryResult::Deferred(IGNORED_ATTEMPTS, format!("I/O error: {:?}", ioe))
+                },
+                _ => {
+                    info!("(worker) Delivery Failed (I/O error): {:?}", ioe);
+                    DeliveryResult::Failed(format!("I/O error: {:?}", ioe))
+                }
+            }
+        },
+        Err(LettreSmtpError::Tls(tlse)) => {
+            info!("(worker) Delivery Failed (TLS error): {:?}", tlse);
+            DeliveryResult::Failed(format!("TLS error: {:?}", tlse))
+        },
+        Err(LettreSmtpError::Parsing(nomek)) => {
+            info!("(worker) Delivery Failed (Parsing error): {:?}", nomek);
+            DeliveryResult::Failed(format!("Parsing error: {:?}", nomek))
+        },
         Err(e) => {
             info!("(worker) delivery failed response: {:?}", e);
             DeliveryResult::Failed(format!("{:?}", e))
