@@ -256,6 +256,10 @@ impl<S: MailstromStorage + 'static> Worker<S> {
         resolver: Option<&Resolver>,
     ) -> WorkerStatus {
 
+        debug!("(worker) Attempting to send message id={} ({} attempts remaining)",
+               internal_message_status.message_id,
+               internal_message_status.attempts_remaining);
+
         // Determine MX records only if doing remote delivery
         if let DeliveryConfig::Remote(_) = self.config.delivery {
 
@@ -301,8 +305,14 @@ impl<S: MailstromStorage + 'static> Worker<S> {
         // Attempt delivery of the email
         if deliver_to_all_servers(&email, &mut internal_message_status, &self.config) {
             internal_message_status.attempts_remaining = 0;
+
+            debug!("(worker) message id={} delivered to all recipients.",
+                   internal_message_status.message_id);
         } else {
             internal_message_status.attempts_remaining -= 1;
+            debug!("(worker) message id={} not delivered to all recipients ({} attempts remaining)",
+                   internal_message_status.message_id,
+                   internal_message_status.attempts_remaining);
         }
 
         // Update storage with the new delivery results
@@ -317,8 +327,7 @@ impl<S: MailstromStorage + 'static> Worker<S> {
             let delay = Duration::from_secs(
                 self.config.base_resend_delay_secs * 3u64.pow(u32::from(attempt)),
             );
-            trace!(
-                "Queueing task to retry {} in {} seconds",
+            debug!("(worker) Queueing task to retry id={} in {} seconds",
                 &internal_message_status.message_id,
                 delay.as_secs()
             );
