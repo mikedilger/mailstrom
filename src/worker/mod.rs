@@ -151,10 +151,10 @@ impl<S: MailstromStorage + 'static> Worker<S> {
             // tasks in the tasklist (and we are not paused), this will be the time until
             // the first task is due.  Otherwise it is set to LOOP_DELAY seconds.
             let timeout: Duration = if self.paused {
-                debug!("(worker) loop start (paused)");
+                trace!("(worker) loop start (paused)");
                 Duration::from_secs(LOOP_DELAY)
             } else if let Some(task) = self.tasks.iter().next() {
-                debug!("(worker) loop start (tasks in queue)");
+                trace!("(worker) loop start (tasks in queue)");
                 let now = Instant::now();
                 if task.time > now {
                     task.time - now
@@ -162,11 +162,11 @@ impl<S: MailstromStorage + 'static> Worker<S> {
                     Duration::new(0, 0) // overdue!
                 }
             } else {
-                debug!("(worker) loop start (no tasks)");
+                trace!("(worker) loop start (no tasks)");
                 Duration::from_secs(LOOP_DELAY)
             };
 
-            debug!(
+            trace!(
                 "(worker) waiting for a message ({} seconds)",
                 timeout.as_secs()
             );
@@ -176,7 +176,7 @@ impl<S: MailstromStorage + 'static> Worker<S> {
             match self.receiver.recv_timeout(timeout) {
                 Ok(message) => match message {
                     Message::Start => {
-                        trace!("(worker) starting");
+                        debug!("(worker) starting");
                         self.paused = false;
                     }
                     Message::SendEmail(message_id) => {
