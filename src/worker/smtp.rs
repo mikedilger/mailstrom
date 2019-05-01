@@ -42,13 +42,27 @@ pub fn smtp_delivery(
         }
     };
 
-    let tls_parameters =
-        ClientTlsParameters::new(smtp_server_domain.to_owned(), tls_builder);
-
-    let client_security = if config.require_tls {
-        ClientSecurity::Required(tls_parameters)
+    let client_security = if let DeliveryConfig::Relay(ref rc) = config.delivery {
+        if rc.use_tls {
+            let tls_parameters =
+                ClientTlsParameters::new(smtp_server_domain.to_owned(), tls_builder);
+            if config.require_tls {
+                ClientSecurity::Required(tls_parameters)
+            } else {
+                ClientSecurity::Opportunistic(tls_parameters)
+            }
+        } else {
+            ClientSecurity::None
+        }
     } else {
-        ClientSecurity::Opportunistic(tls_parameters)
+        let tls_parameters =
+            ClientTlsParameters::new(smtp_server_domain.to_owned(), tls_builder);
+
+        if config.require_tls {
+            ClientSecurity::Required(tls_parameters)
+        } else {
+            ClientSecurity::Opportunistic(tls_parameters)
+        }
     };
 
     // Build sockaddr
