@@ -18,8 +18,8 @@ pub struct PreparedEmail {
 }
 
 impl PreparedEmail {
-    pub fn as_sendable_email(&self) -> Result<SendableEmail, failure::Error> {
-        let to: Result<Vec<EmailAddress>, failure::Error> =
+    pub fn as_sendable_email(&self) -> Result<SendableEmail, lettre::error::Error> {
+        let to: Result<Vec<EmailAddress>, lettre::error::Error> =
             self.to.iter().map(|s| EmailAddress::new(s.clone())).collect();
         let to = to?;
 

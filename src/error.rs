@@ -1,7 +1,6 @@
 use crate::storage::MailstromStorageError;
 use crate::worker::Message;
 use email_format::rfc5322::ParseError;
-use failure;
 use std::convert::From;
 use std::io::Error as IoError;
 use std::sync::mpsc::SendError;
@@ -15,7 +14,7 @@ pub enum Error {
     DnsUnavailable,
     Lock,
     Io(IoError),
-    LettreEmailAddress(failure::Error),
+    LettreEmailAddress(lettre::error::Error),
 }
 
 impl From<SendError<Message>> for Error {
@@ -45,12 +44,6 @@ impl<S: MailstromStorageError> From<S> for Error {
 impl From<IoError> for Error {
     fn from(e: IoError) -> Error {
         Error::Io(e)
-    }
-}
-
-impl From<failure::Error> for Error {
-    fn from(f: failure::Error) -> Error {
-        Error::LettreEmailAddress(f)
     }
 }
 

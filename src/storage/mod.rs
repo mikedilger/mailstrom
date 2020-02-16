@@ -43,3 +43,5 @@ pub trait MailstromStorage: Send + Sync {
     /// and setting that boolean to true when this function is run.
     fn retrieve_all_recent(&mut self) -> Result<Vec<InternalMessageStatus>, Self::Error>;
 }
+
+impl MailstromStorageError for lettre::error::Error { }
