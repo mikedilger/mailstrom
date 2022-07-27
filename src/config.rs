@@ -16,7 +16,7 @@ pub struct RelayConfig {
     pub domain_name: String,
     pub port: Option<u16>,
     pub use_tls: bool,
-    pub auth: SmtpAuth,
+    pub auth: Option<SmtpAuth>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

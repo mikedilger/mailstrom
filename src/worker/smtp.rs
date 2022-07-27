@@ -105,12 +105,14 @@ pub fn smtp_delivery(
         .timeout(Some(Duration::from_secs( config.smtp_timeout_secs )));
 
     if let DeliveryConfig::Relay(ref relay_config) = config.delivery {
-        mailer = mailer
-            .authentication_mechanism(relay_config.auth.mechanism)
-            .credentials(Credentials::new(
-                relay_config.auth.username.clone(),
-                relay_config.auth.password.clone()
-            ));
+        if let Some(ref auth) = relay_config.auth {
+            mailer = mailer
+                .authentication_mechanism(auth.mechanism)
+                .credentials(Credentials::new(
+                    auth.username.clone(),
+                    auth.password.clone()
+                ));
+        }
     }
 
     let mut mailer = mailer.transport();
