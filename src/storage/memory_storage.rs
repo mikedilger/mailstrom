@@ -9,24 +9,12 @@ use std::fmt;
 pub enum MemoryStorageError {
     NotFound,
 }
-impl Error for MemoryStorageError {
-    fn description(&self) -> &str {
-        match *self {
-            MemoryStorageError::NotFound => "Email not found",
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn Error> {
-        match *self {
-            _ => None,
-        }
-    }
-}
+impl Error for MemoryStorageError { }
 impl MailstromStorageError for MemoryStorageError {}
 
 impl fmt::Display for MemoryStorageError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Memory Storage Error: {}", self.description())
+        write!(f, "Memory Storage Error: Email not found")
     }
 }
 

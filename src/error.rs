@@ -49,39 +49,17 @@ impl From<IoError> for Error {
 
 impl ::std::fmt::Display for Error {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        use std::error::Error as StdError;
-
         match *self {
-            Error::Send(ref e) => format!("{}: {:?}", self.description(), e).fmt(f),
-            Error::EmailParser(ref e) => format!("{}: {:?}", self.description(), e).fmt(f),
-            Error::General(ref e) => format!("{}: {}", self.description(), e).fmt(f),
-            Error::Storage(ref s) => format!("{}: {}", self.description(), s).fmt(f),
-            Error::LettreEmailAddress(ref e) => format!("{}: {}", self.description(), e).fmt(f),
-            _ => self.description().to_string().fmt(f),
+            Error::Send(ref e) => write!(f, "Unable to send message to worker: {:?}", e),
+            Error::EmailParser(ref e) => write!(f, "Email does not parse: {:?}", e),
+            Error::General(ref e) => write!(f, "General error: {}", e),
+            Error::Storage(ref s) => write!(f, "Could not store or retrieve email state data: {}", s),
+            Error::DnsUnavailable => write!(f, "DNS unavailable"),
+            Error::Lock => write!(f, "Lock poisoned"),
+            Error::Io(ref e) => write!(f, "I/O Error: {}", e),
+            Error::LettreEmailAddress(ref e) => write!(f, "Lettre crate Email Address error: {}", e),
         }
     }
 }
 
-impl ::std::error::Error for Error {
-    fn description(&self) -> &str {
-        match *self {
-            Error::Send(_) => "Unable to send message to worker",
-            Error::EmailParser(_) => "Email does not parse",
-            Error::General(_) => "General error",
-            Error::Storage(_) => "Could not store or retrieve email state data",
-            Error::DnsUnavailable => "DNS unavailable",
-            Error::Lock => "Lock poisoned",
-            Error::Io(_) => "I/O error",
-            Error::LettreEmailAddress(_) => "Lettre crate Email Address error",
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn ::std::error::Error> {
-        match *self {
-            Error::Send(ref e) => Some(e),
-            Error::EmailParser(ref e) => Some(e),
-            Error::Io(ref e) => Some(e),
-            _ => None,
-        }
-    }
-}
+impl ::std::error::Error for Error { }
