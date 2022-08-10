@@ -173,6 +173,13 @@ pub fn smtp_delivery(
         },
         Err(LettreSmtpError::Io(ioe)) => {
             match ioe.kind() {
+                ErrorKind::ConnectionRefused |
+                ErrorKind::ConnectionReset |
+                // The following are only available on nightly (see rust #86442)
+                // ErrorKind::HostUnreachable |
+                // ErrorKind::NetworkUnreachable |
+                // ErrorKind::NetworkDown |
+                // ErrorKind::ResourceBusy |
                 ErrorKind::ConnectionAborted |
                 ErrorKind::AddrInUse |
                 ErrorKind::BrokenPipe |
@@ -182,8 +189,21 @@ pub fn smtp_delivery(
                     DeliveryResult::Deferred(IGNORED_ATTEMPTS, format!("I/O error: {:?}", ioe))
                 },
                 _ => {
-                    info!("(worker) Delivery Failed (I/O error): {:?}", ioe);
-                    DeliveryResult::Failed(format!("I/O error: {:?}", ioe))
+                    // We still might defer on other errors that stable rust doesn't
+                    // represent as enum variants in std::io::ErrorKind yet. We find
+                    // these by inspecting their debug representations
+                    let asdebug = format!("{:?}", ioe);
+                    if asdebug.contains("kind: HostUnreachable") ||
+                        asdebug.contains("kind: NetworkUnreachable") ||
+                        asdebug.contains("kind: NetworkDown") ||
+                        asdebug.contains("kind: ResourceBusy")
+                    {
+                        info!("(worker) Delivery Deferred (I/O error): {:?}", ioe);
+                        DeliveryResult::Deferred(IGNORED_ATTEMPTS, format!("I/O error: {:?}", ioe))
+                    } else {
+                        info!("(worker) Delivery Failed (I/O error): {:?}", ioe);
+                        DeliveryResult::Failed(format!("I/O error: {:?}", ioe))
+                    }
                 }
             }
         },
